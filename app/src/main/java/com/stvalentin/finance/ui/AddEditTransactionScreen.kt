@@ -18,6 +18,8 @@ import androidx.navigation.NavController
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionCategories
 import com.stvalentin.finance.data.TransactionType
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +37,12 @@ fun AddEditTransactionScreen(
     var showError by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
+    // НОВОЕ: состояние для даты
+    var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
+    
     // Загружаем транзакцию для редактирования
     val isEditing = transactionId != null && transactionId != 0L
     val transaction by viewModel.getTransactionById(transactionId ?: 0).collectAsState(initial = null)
@@ -46,6 +54,7 @@ fun AddEditTransactionScreen(
             amountText = transaction!!.amount.toString()
             selectedCategory = transaction!!.category
             description = transaction!!.description
+            selectedDate = transaction!!.date // НОВОЕ: загружаем дату
         }
     }
 
@@ -130,7 +139,6 @@ fun AddEditTransactionScreen(
                         .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    // Кнопка "Расход"
                     Button(
                         onClick = { selectedType = TransactionType.EXPENSE },
                         colors = ButtonDefaults.buttonColors(
@@ -157,7 +165,6 @@ fun AddEditTransactionScreen(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Кнопка "Доход"
                     Button(
                         onClick = { selectedType = TransactionType.INCOME },
                         colors = ButtonDefaults.buttonColors(
@@ -184,7 +191,7 @@ fun AddEditTransactionScreen(
                 }
             }
             
-            // Поле ввода суммы - УБРАЛ ИКОНКУ ДОЛЛАРА, ОСТАВИЛ ТОЛЬКО ₽ СПРАВА
+            // Сумма
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { 
@@ -210,7 +217,59 @@ fun AddEditTransactionScreen(
                 singleLine = true
             )
             
-            // Выпадающий список категорий
+            // НОВОЕ: Поле выбора даты
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = "Дата",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Дата",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = dateFormat.format(Date(selectedDate)),
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                        }
+                    }
+                    
+                    Button(
+                        onClick = { showDatePicker = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("Выбрать", fontSize = 12.sp)
+                    }
+                }
+            }
+            
+            // Категория
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = it }
@@ -242,7 +301,7 @@ fun AddEditTransactionScreen(
                 }
             }
             
-            // Поле описания (необязательное)
+            // Описание
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -265,7 +324,8 @@ fun AddEditTransactionScreen(
                                     type = selectedType,
                                     category = selectedCategory,
                                     amount = amount,
-                                    description = description
+                                    description = description,
+                                    date = selectedDate // НОВОЕ: сохраняем выбранную дату
                                 )
                                 viewModel.updateTransaction(updatedTransaction)
                             } else {
@@ -273,7 +333,8 @@ fun AddEditTransactionScreen(
                                     type = selectedType,
                                     category = selectedCategory,
                                     amount = amount,
-                                    description = description
+                                    description = description,
+                                    date = selectedDate // НОВОЕ: сохраняем выбранную дату
                                 )
                             }
                             navController.navigateUp()
@@ -312,6 +373,18 @@ fun AddEditTransactionScreen(
         }
     }
     
+    // НОВОЕ: Диалог выбора даты
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDateSelected = { timestamp ->
+                selectedDate = timestamp
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false },
+            initialDate = selectedDate
+        )
+    }
+    
     // Диалог подтверждения удаления
     if (showDeleteDialog && transaction != null) {
         AlertDialog(
@@ -336,4 +409,52 @@ fun AddEditTransactionScreen(
             }
         )
     }
+}
+
+// НОВОЕ: Компонент выбора даты
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerDialog(
+    onDateSelected: (Long) -> Unit,
+    onDismiss: () -> Unit,
+    initialDate: Long
+) {
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = initialDate
+    }
+    
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        onDateSelected(it)
+                    }
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        },
+        title = {
+            Text("Выберите дату")
+        },
+        text = {
+            DatePicker(
+                state = datePickerState,
+                title = null,
+                headline = null,
+                showModeToggle = false
+            )
+        }
+    )
 }

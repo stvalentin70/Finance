@@ -33,6 +33,11 @@ fun StatisticsScreen(
     val expenseStats by viewModel.getExpenseStats().collectAsState()
     val incomeStats by viewModel.getIncomeStats().collectAsState()
     
+    val averageDailyExpense by viewModel.averageDailyExpense.collectAsState()
+    val topExpenseCategory by viewModel.topExpenseCategory.collectAsState()
+    val expenseComparison by viewModel.expenseComparison.collectAsState()
+    val adviceMessage by viewModel.adviceMessage.collectAsState()
+    
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
     
     var selectedPeriod by remember { mutableStateOf(Period.MONTH) }
@@ -70,6 +75,7 @@ fun StatisticsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // БАЛАНС
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -101,6 +107,109 @@ fun StatisticsScreen(
                 }
             }
             
+            // АНАЛИТИКА
+            if (totalExpenses > 0) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "📊 АНАЛИТИКА ЗА МЕСЯЦ",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            Divider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                thickness = 1.dp
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Средний расход в день:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = currencyFormat.format(averageDailyExpense),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = ExpenseRed
+                                )
+                            }
+                            
+                            topExpenseCategory?.let { (category, amount) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Самая затратная категория:",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "$category • ${currencyFormat.format(amount)}",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = ExpenseRed
+                                    )
+                                }
+                            }
+                            
+                            if (expenseComparison != 0.0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "vs прошлый месяц:",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    val sign = if (expenseComparison > 0) "+" else ""
+                                    val color = when {
+                                        expenseComparison > 10 -> ExpenseRed
+                                        expenseComparison < -5 -> IncomeGreen
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                    Text(
+                                        text = "$sign${"%.1f".format(expenseComparison)}%",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = color
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // СОВЕТ
+                item {
+                    AdviceCard(message = adviceMessage)
+                }
+            }
+            
+            // ПЕРИОДЫ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -142,6 +251,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // ДИНАМИКА БАЛАНСА
             if (balanceHistory.isNotEmpty()) {
                 item {
                     Card(
@@ -170,6 +280,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // РАЗДЕЛИТЕЛЬ
             item {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -177,6 +288,7 @@ fun StatisticsScreen(
                 )
             }
             
+            // ДОХОДЫ
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -228,6 +340,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // РАСХОДЫ
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -284,6 +397,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // РАЗДЕЛИТЕЛЬ
             item {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -292,6 +406,7 @@ fun StatisticsScreen(
                 )
             }
             
+            // РАСХОДЫ ПО КАТЕГОРИЯМ
             if (expenseStats.isNotEmpty()) {
                 item {
                     Text(
@@ -314,6 +429,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // РАЗДЕЛИТЕЛЬ
             if (expenseStats.isNotEmpty() && incomeStats.isNotEmpty()) {
                 item {
                     HorizontalDivider(
@@ -324,6 +440,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // ДОХОДЫ ПО КАТЕГОРИЯМ
             if (incomeStats.isNotEmpty()) {
                 item {
                     Text(
@@ -346,6 +463,7 @@ fun StatisticsScreen(
                 }
             }
             
+            // ПУСТОЙ ЭКРАН
             if (expenseStats.isEmpty() && incomeStats.isEmpty()) {
                 item {
                     Column(
