@@ -6,15 +6,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionType
+import java.text.NumberFormat
+import java.util.*
 
 @Composable
 fun TransactionItem(
@@ -23,6 +25,8 @@ fun TransactionItem(
     onDeleteClick: (Transaction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -117,7 +121,7 @@ fun TransactionItem(
             ) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${if (transaction.type == TransactionType.INCOME) "+" else "-"}${String.format("%,.2f", transaction.amount)} ₽",
+                        text = currencyFormat.format(transaction.amount),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -155,18 +159,24 @@ fun getCategoryIcon(category: String, type: TransactionType): ImageVector {
         "Инвестиции" -> Icons.Default.TrendingUp
         "Подарок" -> Icons.Default.CardGiftcard
         "Возврат долга" -> Icons.Default.SwapHoriz
-        "Другое" -> if (type == TransactionType.INCOME) Icons.Default.AttachMoney else Icons.Default.MoreHoriz
         
         // Расходы
         "Продукты" -> Icons.Default.ShoppingCart
         "Транспорт" -> Icons.Default.DirectionsBus
         "Жилье" -> Icons.Default.Home
+        "Кредиты" -> Icons.Default.CreditCard
+        "Ипотека" -> Icons.Default.House
+        "Рассрочка" -> Icons.Default.ShoppingCart
         "Развлечения" -> Icons.Default.Movie
         "Здоровье" -> Icons.Default.LocalHospital
         "Одежда" -> Icons.Default.ShoppingBag
         "Образование" -> Icons.Default.School
         "Рестораны" -> Icons.Default.Restaurant
-        "Кафе" -> Icons.Default.FreeBreakfast
-        else -> if (type == TransactionType.INCOME) Icons.Default.AttachMoney else Icons.Default.ShoppingCart
+        
+        // По умолчанию
+        else -> if (type == TransactionType.INCOME) 
+            Icons.Default.AttachMoney 
+        else 
+            Icons.Default.ShoppingCart
     }
 }

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,7 +30,7 @@ fun FinanceApp() {
     FinanceTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = androidx.compose.material3.MaterialTheme.colorScheme.background
+            color = MaterialTheme.colorScheme.background
         ) {
             val context = LocalContext.current
             val database = AppDatabase.getDatabase(context)
@@ -51,6 +52,9 @@ fun FinanceApp() {
                         onTransactionClick = { transaction ->
                             navController.navigate("add_transaction/${transaction.id}")
                         },
+                        onStatisticsClick = {
+                            navController.navigate("statistics")
+                        },
                         viewModel = viewModel
                     )
                 }
@@ -60,6 +64,13 @@ fun FinanceApp() {
                     AddEditTransactionScreen(
                         navController = navController,
                         transactionId = transactionId,
+                        viewModel = viewModel
+                    )
+                }
+                
+                composable("statistics") {
+                    StatisticsScreen(
+                        navController = navController,
                         viewModel = viewModel
                     )
                 }

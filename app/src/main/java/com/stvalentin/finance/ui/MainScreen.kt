@@ -20,6 +20,7 @@ import java.util.*
 fun MainScreen(
     onAddTransactionClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
+    onStatisticsClick: () -> Unit,
     viewModel: FinanceViewModel
 ) {
     val transactions by viewModel.allTransactions.collectAsState()
@@ -43,7 +44,7 @@ fun MainScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "Финансы",
+                        text = "Трекер финансов",  // ИЗМЕНЕНО: было "Финансы"
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -54,6 +55,14 @@ fun MainScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
+                    // Кнопка статистики
+                    IconButton(onClick = onStatisticsClick) {
+                        Icon(
+                            imageVector = Icons.Default.PieChart,
+                            contentDescription = "Статистика"
+                        )
+                    }
+                    
                     // Меню сортировки
                     var expanded by remember { mutableStateOf(false) }
                     

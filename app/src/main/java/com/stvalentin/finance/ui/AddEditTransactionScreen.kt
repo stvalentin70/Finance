@@ -144,7 +144,7 @@ fun AddEditTransactionScreen(
                                 ExpenseRed
                         ),
                         modifier = Modifier.weight(1f),
-                        enabled = !isEditing // Нельзя менять тип при редактировании
+                        enabled = !isEditing
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowDownward,
@@ -171,7 +171,7 @@ fun AddEditTransactionScreen(
                                 IncomeGreen
                         ),
                         modifier = Modifier.weight(1f),
-                        enabled = !isEditing // Нельзя менять тип при редактировании
+                        enabled = !isEditing
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowUpward,
@@ -184,7 +184,7 @@ fun AddEditTransactionScreen(
                 }
             }
             
-            // Поле ввода суммы
+            // Поле ввода суммы - УБРАЛ ИКОНКУ ДОЛЛАРА, ОСТАВИЛ ТОЛЬКО ₽ СПРАВА
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { 
@@ -194,12 +194,6 @@ fun AddEditTransactionScreen(
                 },
                 label = { Text("Сумма") },
                 placeholder = { Text("0.00") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.AttachMoney,
-                        contentDescription = null
-                    )
-                },
                 trailingIcon = {
                     Text(
                         text = "₽",
@@ -252,8 +246,8 @@ fun AddEditTransactionScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Описание (необязательно)") },
-                placeholder = { Text("Например: Продукты в Пятерочке") },
+                label = { Text("Описание") },
+                placeholder = { Text("Продукты, транспорт, развлечения...") },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 2
             )
@@ -267,7 +261,6 @@ fun AddEditTransactionScreen(
                         val amount = amountText.toDoubleOrNull() ?: 0.0
                         if (amount > 0) {
                             if (isEditing && transaction != null) {
-                                // Обновляем существующую транзакцию
                                 val updatedTransaction = transaction!!.copy(
                                     type = selectedType,
                                     category = selectedCategory,
@@ -276,7 +269,6 @@ fun AddEditTransactionScreen(
                                 )
                                 viewModel.updateTransaction(updatedTransaction)
                             } else {
-                                // Добавляем новую транзакцию
                                 viewModel.addTransaction(
                                     type = selectedType,
                                     category = selectedCategory,
