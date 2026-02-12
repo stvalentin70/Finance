@@ -44,7 +44,7 @@ fun StatisticsScreen(
     
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = "Статистика",
@@ -53,18 +53,11 @@ fun StatisticsScreen(
                         )
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Назад"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                // КНОПКА НАЗАД УБРАНА!
             )
         }
     ) { paddingValues ->

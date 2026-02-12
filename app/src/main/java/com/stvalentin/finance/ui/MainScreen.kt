@@ -3,6 +3,7 @@ package com.stvalentin.finance.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -11,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.stvalentin.finance.data.Transaction
 import java.text.SimpleDateFormat
 import java.util.*
@@ -20,7 +22,6 @@ import java.util.*
 fun MainScreen(
     onAddTransactionClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
-    onStatisticsClick: () -> Unit,
     viewModel: FinanceViewModel
 ) {
     val transactions by viewModel.allTransactions.collectAsState()
@@ -31,7 +32,6 @@ fun MainScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     
-    // Группировка транзакций по дате
     val groupedTransactions = remember(transactions) {
         transactions.groupBy { transaction ->
             val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
@@ -44,7 +44,7 @@ fun MainScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "Трекер финансов",  // ИЗМЕНЕНО: было "Финансы"
+                        text = "Трекер финансов",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -53,55 +53,16 @@ fun MainScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                actions = {
-                    // Кнопка статистики
-                    IconButton(onClick = onStatisticsClick) {
-                        Icon(
-                            imageVector = Icons.Default.PieChart,
-                            contentDescription = "Статистика"
-                        )
-                    }
-                    
-                    // Меню сортировки
-                    var expanded by remember { mutableStateOf(false) }
-                    
-                    IconButton(onClick = { expanded = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Sort,
-                            contentDescription = "Сортировка"
-                        )
-                    }
-                    
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("По дате (новые)") },
-                            onClick = { expanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("По дате (старые)") },
-                            onClick = { expanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("По сумме (возраст.)") },
-                            onClick = { expanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("По сумме (убыв.)") },
-                            onClick = { expanded = false }
-                        )
-                    }
-                }
+                )
+                // КНОПКИ УБРАНЫ!
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddTransactionClick,
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Добавить транзакцию")
             }
@@ -180,7 +141,6 @@ fun MainScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     groupedTransactions.forEach { (date, transactionsForDate) ->
-                        // Заголовок даты
                         item {
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
@@ -198,7 +158,6 @@ fun MainScreen(
                             }
                         }
                         
-                        // Транзакции за эту дату
                         items(transactionsForDate) { transaction ->
                             TransactionItem(
                                 transaction = transaction,

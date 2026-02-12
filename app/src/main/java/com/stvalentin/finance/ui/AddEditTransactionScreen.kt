@@ -28,7 +28,6 @@ fun AddEditTransactionScreen(
     transactionId: Long? = null,
     viewModel: FinanceViewModel = viewModel()
 ) {
-    // Состояния формы
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var amountText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
@@ -37,24 +36,22 @@ fun AddEditTransactionScreen(
     var showError by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
-    // НОВОЕ: состояние для даты
+    // Дата
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
     
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
     
-    // Загружаем транзакцию для редактирования
     val isEditing = transactionId != null && transactionId != 0L
     val transaction by viewModel.getTransactionById(transactionId ?: 0).collectAsState(initial = null)
     
-    // Заполняем форму при редактировании
     LaunchedEffect(transaction) {
         if (isEditing && transaction != null) {
             selectedType = transaction!!.type
             amountText = transaction!!.amount.toString()
             selectedCategory = transaction!!.category
             description = transaction!!.description
-            selectedDate = transaction!!.date // НОВОЕ: загружаем дату
+            selectedDate = transaction!!.date
         }
     }
 
@@ -64,7 +61,6 @@ fun AddEditTransactionScreen(
         TransactionCategories.expenseCategories
     }
 
-    // Устанавливаем категорию по умолчанию для нового
     LaunchedEffect(selectedType) {
         if (!isEditing) {
             selectedCategory = categories.firstOrNull() ?: ""
@@ -73,7 +69,7 @@ fun AddEditTransactionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = if (isEditing) {
@@ -86,15 +82,7 @@ fun AddEditTransactionScreen(
                         )
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Назад"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = if (selectedType == TransactionType.INCOME) 
                         IncomeGreen.copy(alpha = 0.1f) 
                     else 
@@ -103,18 +91,8 @@ fun AddEditTransactionScreen(
                         IncomeGreen 
                     else 
                         ExpenseRed
-                ),
-                actions = {
-                    if (isEditing) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Удалить",
-                                tint = ExpenseRed
-                            )
-                        }
-                    }
-                }
+                )
+                // КНОПКА НАЗАД УБРАНА!
             )
         }
     ) { paddingValues ->
@@ -217,7 +195,7 @@ fun AddEditTransactionScreen(
                 singleLine = true
             )
             
-            // НОВОЕ: Поле выбора даты
+            // Дата
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -325,7 +303,7 @@ fun AddEditTransactionScreen(
                                     category = selectedCategory,
                                     amount = amount,
                                     description = description,
-                                    date = selectedDate // НОВОЕ: сохраняем выбранную дату
+                                    date = selectedDate
                                 )
                                 viewModel.updateTransaction(updatedTransaction)
                             } else {
@@ -334,7 +312,7 @@ fun AddEditTransactionScreen(
                                     category = selectedCategory,
                                     amount = amount,
                                     description = description,
-                                    date = selectedDate // НОВОЕ: сохраняем выбранную дату
+                                    date = selectedDate
                                 )
                             }
                             navController.navigateUp()
@@ -373,7 +351,7 @@ fun AddEditTransactionScreen(
         }
     }
     
-    // НОВОЕ: Диалог выбора даты
+    // Диалог выбора даты
     if (showDatePicker) {
         DatePickerDialog(
             onDateSelected = { timestamp ->
@@ -411,7 +389,6 @@ fun AddEditTransactionScreen(
     }
 }
 
-// НОВОЕ: Компонент выбора даты
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatePickerDialog(
@@ -419,10 +396,6 @@ fun DatePickerDialog(
     onDismiss: () -> Unit,
     initialDate: Long
 ) {
-    val calendar = Calendar.getInstance().apply {
-        timeInMillis = initialDate
-    }
-    
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialDate
     )
