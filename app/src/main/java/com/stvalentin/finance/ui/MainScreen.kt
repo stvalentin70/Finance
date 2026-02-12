@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.stvalentin.finance.data.Transaction
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +30,14 @@ fun MainScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     
+    // Группировка транзакций по дате
+    val groupedTransactions = remember(transactions) {
+        transactions.groupBy { transaction ->
+            val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
+            dateFormat.format(Date(transaction.date))
+        }.toSortedMap(Comparator.reverseOrder())
+    }
+    
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -42,7 +52,40 @@ fun MainScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                ),
+                actions = {
+                    // Меню сортировки
+                    var expanded by remember { mutableStateOf(false) }
+                    
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = "Сортировка"
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("По дате (новые)") },
+                            onClick = { expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("По дате (старые)") },
+                            onClick = { expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("По сумме (возраст.)") },
+                            onClick = { expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("По сумме (убыв.)") },
+                            onClick = { expanded = false }
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -77,7 +120,7 @@ fun MainScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = "Последние транзакции",
+                    text = "История операций",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -85,14 +128,14 @@ fun MainScreen(
                 
                 if (transactions.isNotEmpty()) {
                     Text(
-                        text = "${transactions.size} транзакций",
+                        text = "${transactions.size} операций",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
             
-            // Список транзакций
+            // Список транзакций с группировкой
             if (transactions.isEmpty()) {
                 // Пустой экран
                 Column(
@@ -127,16 +170,37 @@ fun MainScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(transactions) { transaction ->
-                        TransactionItem(
-                            transaction = transaction,
-                            onTransactionClick = onTransactionClick,
-                            onDeleteClick = {
-                                transactionToDelete = it
-                                showDeleteDialog = true
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    groupedTransactions.forEach { (date, transactionsForDate) ->
+                        // Заголовок даты
+                        item {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = date,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                        
+                        // Транзакции за эту дату
+                        items(transactionsForDate) { transaction ->
+                            TransactionItem(
+                                transaction = transaction,
+                                onTransactionClick = onTransactionClick,
+                                onDeleteClick = {
+                                    transactionToDelete = it
+                                    showDeleteDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

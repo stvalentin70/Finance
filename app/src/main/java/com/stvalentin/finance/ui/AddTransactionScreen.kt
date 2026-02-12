@@ -164,6 +164,14 @@ fun AddTransactionScreen(
                         contentDescription = null
                     )
                 },
+                trailingIcon = {
+                    Text(
+                        text = "₽",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal
                 ),
