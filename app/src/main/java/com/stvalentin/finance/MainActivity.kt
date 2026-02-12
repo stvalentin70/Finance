@@ -92,14 +92,8 @@ fun FinanceApp() {
                         }
                         
                         composable("history") {
-                            // TODO: Экран истории
-                            MainScreen(
-                                onAddTransactionClick = {
-                                    navController.navigate("add_transaction/0")
-                                },
-                                onTransactionClick = { transaction ->
-                                    navController.navigate("add_transaction/${transaction.id}")
-                                },
+                            HistoryScreen(
+                                navController = navController,
                                 viewModel = viewModel
                             )
                         }

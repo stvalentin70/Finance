@@ -92,7 +92,6 @@ fun AddEditTransactionScreen(
                     else 
                         ExpenseRed
                 )
-                // КНОПКА НАЗАД УБРАНА!
             )
         }
     ) { paddingValues ->
@@ -387,47 +386,4 @@ fun AddEditTransactionScreen(
             }
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DatePickerDialog(
-    onDateSelected: (Long) -> Unit,
-    onDismiss: () -> Unit,
-    initialDate: Long
-) {
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialDate
-    )
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        onDateSelected(it)
-                    }
-                }
-            ) {
-                Text("OK")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Отмена")
-            }
-        },
-        title = {
-            Text("Выберите дату")
-        },
-        text = {
-            DatePicker(
-                state = datePickerState,
-                title = null,
-                headline = null,
-                showModeToggle = false
-            )
-        }
-    )
 }
