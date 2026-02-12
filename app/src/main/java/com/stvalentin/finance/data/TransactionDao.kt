@@ -10,7 +10,7 @@ interface TransactionDao {
     fun getAllTransactions(): Flow<List<Transaction>>
     
     @Query("SELECT * FROM transactions WHERE id = :id")
-    suspend fun getTransactionById(id: Long): Transaction?
+    fun getTransactionById(id: Long): Flow<Transaction?> // ИЗМЕНИТЬ: suspend -> Flow
     
     @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date DESC")
     fun getTransactionsByType(type: TransactionType): Flow<List<Transaction>>
@@ -33,10 +33,10 @@ interface TransactionDao {
     @Query("DELETE FROM transactions")
     suspend fun deleteAll()
     
-    @Query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 0") // 0 = INCOME
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 0")
     fun getTotalIncome(): Flow<Double>
     
-    @Query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 1") // 1 = EXPENSE
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 1")
     fun getTotalExpenses(): Flow<Double>
     
     @Query("""

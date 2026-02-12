@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionDao
 import com.stvalentin.finance.data.TransactionType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,6 +40,11 @@ class FinanceViewModel(private val transactionDao: TransactionDao) : ViewModel()
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0.0
         )
+    
+    // Новый метод для получения одной транзакции
+    fun getTransactionById(id: Long): Flow<Transaction?> {
+        return transactionDao.getTransactionById(id)
+    }
     
     fun addTransaction(
         type: TransactionType,

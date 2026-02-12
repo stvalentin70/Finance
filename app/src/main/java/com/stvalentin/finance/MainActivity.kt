@@ -46,18 +46,20 @@ fun FinanceApp() {
                 composable("main") {
                     MainScreen(
                         onAddTransactionClick = {
-                            navController.navigate("add_transaction")
+                            navController.navigate("add_transaction/0")
                         },
                         onTransactionClick = { transaction ->
-                            // TODO: Редактирование транзакции
+                            navController.navigate("add_transaction/${transaction.id}")
                         },
                         viewModel = viewModel
                     )
                 }
                 
-                composable("add_transaction") {
-                    AddTransactionScreen(
+                composable("add_transaction/{transactionId}") { backStackEntry ->
+                    val transactionId = backStackEntry.arguments?.getString("transactionId")?.toLongOrNull()
+                    AddEditTransactionScreen(
                         navController = navController,
+                        transactionId = transactionId,
                         viewModel = viewModel
                     )
                 }

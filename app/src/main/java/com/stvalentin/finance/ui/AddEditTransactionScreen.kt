@@ -8,28 +8,46 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionCategories
 import com.stvalentin.finance.data.TransactionType
-import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTransactionScreen(
+fun AddEditTransactionScreen(
     navController: NavController,
+    transactionId: Long? = null,
     viewModel: FinanceViewModel = viewModel()
 ) {
+    // Состояния формы
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var amountText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    
+    // Загружаем транзакцию для редактирования
+    val isEditing = transactionId != null && transactionId != 0L
+    val transaction by viewModel.getTransactionById(transactionId ?: 0).collectAsState(initial = null)
+    
+    // Заполняем форму при редактировании
+    LaunchedEffect(transaction) {
+        if (isEditing && transaction != null) {
+            selectedType = transaction!!.type
+            amountText = transaction!!.amount.toString()
+            selectedCategory = transaction!!.category
+            description = transaction!!.description
+        }
+    }
 
     val categories = if (selectedType == TransactionType.INCOME) {
         TransactionCategories.incomeCategories
@@ -37,9 +55,11 @@ fun AddTransactionScreen(
         TransactionCategories.expenseCategories
     }
 
-    // Устанавливаем категорию по умолчанию
+    // Устанавливаем категорию по умолчанию для нового
     LaunchedEffect(selectedType) {
-        selectedCategory = categories.firstOrNull() ?: ""
+        if (!isEditing) {
+            selectedCategory = categories.firstOrNull() ?: ""
+        }
     }
 
     Scaffold(
@@ -47,7 +67,11 @@ fun AddTransactionScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (selectedType == TransactionType.INCOME) "Добавить доход" else "Добавить расход",
+                        text = if (isEditing) {
+                            if (selectedType == TransactionType.INCOME) "Редактировать доход" else "Редактировать расход"
+                        } else {
+                            if (selectedType == TransactionType.INCOME) "Добавить доход" else "Добавить расход"
+                        },
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -70,7 +94,18 @@ fun AddTransactionScreen(
                         IncomeGreen 
                     else 
                         ExpenseRed
-                )
+                ),
+                actions = {
+                    if (isEditing) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Удалить",
+                                tint = ExpenseRed
+                            )
+                        }
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -108,7 +143,8 @@ fun AddTransactionScreen(
                             else 
                                 ExpenseRed
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isEditing // Нельзя менять тип при редактировании
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowDownward,
@@ -134,7 +170,8 @@ fun AddTransactionScreen(
                             else 
                                 IncomeGreen
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isEditing // Нельзя менять тип при редактировании
                     ) {
                         Icon(
                             imageVector = Icons.Default.ArrowUpward,
@@ -151,7 +188,6 @@ fun AddTransactionScreen(
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { 
-                    // Разрешаем только цифры и точку
                     if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
                         amountText = it
                     }
@@ -230,12 +266,24 @@ fun AddTransactionScreen(
                     if (amountText.isNotEmpty() && selectedCategory.isNotEmpty()) {
                         val amount = amountText.toDoubleOrNull() ?: 0.0
                         if (amount > 0) {
-                            viewModel.addTransaction(
-                                type = selectedType,
-                                category = selectedCategory,
-                                amount = amount,
-                                description = description
-                            )
+                            if (isEditing && transaction != null) {
+                                // Обновляем существующую транзакцию
+                                val updatedTransaction = transaction!!.copy(
+                                    type = selectedType,
+                                    category = selectedCategory,
+                                    amount = amount,
+                                    description = description
+                                )
+                                viewModel.updateTransaction(updatedTransaction)
+                            } else {
+                                // Добавляем новую транзакцию
+                                viewModel.addTransaction(
+                                    type = selectedType,
+                                    category = selectedCategory,
+                                    amount = amount,
+                                    description = description
+                                )
+                            }
                             navController.navigateUp()
                         } else {
                             showError = true
@@ -255,7 +303,7 @@ fun AddTransactionScreen(
                 )
             ) {
                 Text(
-                    text = "Сохранить",
+                    text = if (isEditing) "Обновить" else "Сохранить",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -270,5 +318,30 @@ fun AddTransactionScreen(
                 )
             }
         }
+    }
+    
+    // Диалог подтверждения удаления
+    if (showDeleteDialog && transaction != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Удалить транзакцию?") },
+            text = { Text("Вы уверены, что хотите удалить эту транзакцию?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTransaction(transaction!!)
+                        showDeleteDialog = false
+                        navController.navigateUp()
+                    }
+                ) {
+                    Text("Удалить", color = ExpenseRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }
