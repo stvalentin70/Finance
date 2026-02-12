@@ -8,8 +8,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.stvalentin.finance.data.AppDatabase
 import com.stvalentin.finance.ui.*
 
@@ -30,29 +32,36 @@ fun FinanceApp() {
             color = androidx.compose.material3.MaterialTheme.colorScheme.background
         ) {
             val context = LocalContext.current
+            val database = AppDatabase.getDatabase(context)
             val viewModel: FinanceViewModel = viewModel(
-                factory = FinanceViewModelFactory(
-                    AppDatabase.getDatabase(context).transactionDao()
-                )
+                factory = FinanceViewModelFactory(database.transactionDao())
             )
             
-            MainScreen(
-                onAddTransactionClick = {
-                    // TODO: Добавить экран добавления транзакции
-                },
-                onTransactionClick = { transaction ->
-                    // TODO: Добавить экран редактирования транзакции
-                },
-                viewModel = viewModel
-            )
+            val navController = rememberNavController()
+            
+            NavHost(
+                navController = navController,
+                startDestination = "main"
+            ) {
+                composable("main") {
+                    MainScreen(
+                        onAddTransactionClick = {
+                            navController.navigate("add_transaction")
+                        },
+                        onTransactionClick = { transaction ->
+                            // TODO: Редактирование транзакции
+                        },
+                        viewModel = viewModel
+                    )
+                }
+                
+                composable("add_transaction") {
+                    AddTransactionScreen(
+                        navController = navController,
+                        viewModel = viewModel
+                    )
+                }
+            }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun FinanceAppPreview() {
-    FinanceTheme {
-        FinanceApp()
     }
 }

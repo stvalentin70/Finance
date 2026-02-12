@@ -9,11 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.stvalentin.finance.data.AppDatabase
 import com.stvalentin.finance.data.Transaction
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,11 +18,7 @@ import com.stvalentin.finance.data.Transaction
 fun MainScreen(
     onAddTransactionClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
-    viewModel: FinanceViewModel = viewModel(
-        factory = FinanceViewModelFactory(
-            AppDatabase.getDatabase(LocalContext.current).transactionDao()
-        )
-    )
+    viewModel: FinanceViewModel
 ) {
     val transactions by viewModel.allTransactions.collectAsState()
     val balance by viewModel.balance.collectAsState()
