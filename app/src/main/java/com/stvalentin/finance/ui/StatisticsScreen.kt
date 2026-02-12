@@ -28,11 +28,14 @@ fun StatisticsScreen(
     val balance by viewModel.balance.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
     val totalExpenses by viewModel.totalExpenses.collectAsState()
+    val balanceHistory by viewModel.balanceHistory.collectAsState()
     
     val expenseStats by viewModel.getExpenseStats().collectAsState()
     val incomeStats by viewModel.getIncomeStats().collectAsState()
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    
+    var selectedPeriod by remember { mutableStateOf(Period.MONTH) }
     
     Scaffold(
         topBar = {
@@ -67,7 +70,6 @@ fun StatisticsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // БАЛАНС - УБРАЛ ЭМОДЗИ $
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -99,7 +101,75 @@ fun StatisticsScreen(
                 }
             }
             
-            // РАЗДЕЛИТЕЛЬ
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        PeriodButton(
+                            text = "Неделя",
+                            isSelected = selectedPeriod == Period.WEEK,
+                            onClick = { selectedPeriod = Period.WEEK },
+                            modifier = Modifier.weight(1f)
+                        )
+                        PeriodButton(
+                            text = "Месяц",
+                            isSelected = selectedPeriod == Period.MONTH,
+                            onClick = { selectedPeriod = Period.MONTH },
+                            modifier = Modifier.weight(1f)
+                        )
+                        PeriodButton(
+                            text = "Квартал",
+                            isSelected = selectedPeriod == Period.QUARTER,
+                            onClick = { selectedPeriod = Period.QUARTER },
+                            modifier = Modifier.weight(1f)
+                        )
+                        PeriodButton(
+                            text = "Год",
+                            isSelected = selectedPeriod == Period.YEAR,
+                            onClick = { selectedPeriod = Period.YEAR },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+            
+            if (balanceHistory.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Динамика баланса",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            BalanceChart(
+                                data = balanceHistory,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+            
             item {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -107,7 +177,6 @@ fun StatisticsScreen(
                 )
             }
             
-            // ДОХОДЫ (ВЕРХНЯЯ ПОЛОСКА)
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -140,9 +209,7 @@ fun StatisticsScreen(
                             color = IncomeGreen
                         )
                     }
-                    
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     LinearProgressIndicator(
                         progress = { 1f },
                         modifier = Modifier
@@ -151,9 +218,7 @@ fun StatisticsScreen(
                         color = IncomeGreen,
                         trackColor = IncomeGreen.copy(alpha = 0.2f)
                     )
-                    
                     Spacer(modifier = Modifier.height(4.dp))
-                    
                     Text(
                         text = "100% от общего дохода",
                         style = MaterialTheme.typography.bodySmall,
@@ -163,7 +228,6 @@ fun StatisticsScreen(
                 }
             }
             
-            // РАСХОДЫ (НИЖНЯЯ ПОЛОСКА)
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -196,15 +260,12 @@ fun StatisticsScreen(
                             color = ExpenseRed
                         )
                     }
-                    
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     val expenseRatio = if (totalIncome > 0) {
                         (totalExpenses / totalIncome).toFloat().coerceIn(0f, 1f)
                     } else {
                         0f
                     }
-                    
                     LinearProgressIndicator(
                         progress = { expenseRatio },
                         modifier = Modifier
@@ -213,9 +274,7 @@ fun StatisticsScreen(
                         color = ExpenseRed,
                         trackColor = ExpenseRed.copy(alpha = 0.2f)
                     )
-                    
                     Spacer(modifier = Modifier.height(4.dp))
-                    
                     Text(
                         text = "${(expenseRatio * 100).toInt()}% от доходов",
                         style = MaterialTheme.typography.bodySmall,
@@ -225,7 +284,6 @@ fun StatisticsScreen(
                 }
             }
             
-            // РАЗДЕЛИТЕЛЬ
             item {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -234,7 +292,6 @@ fun StatisticsScreen(
                 )
             }
             
-            // РАСХОДЫ ПО КАТЕГОРИЯМ
             if (expenseStats.isNotEmpty()) {
                 item {
                     Text(
@@ -245,7 +302,6 @@ fun StatisticsScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                
                 items(expenseStats) { stat ->
                     CategoryBar(
                         category = stat.category,
@@ -258,7 +314,6 @@ fun StatisticsScreen(
                 }
             }
             
-            // РАЗДЕЛИТЕЛЬ
             if (expenseStats.isNotEmpty() && incomeStats.isNotEmpty()) {
                 item {
                     HorizontalDivider(
@@ -269,7 +324,6 @@ fun StatisticsScreen(
                 }
             }
             
-            // ДОХОДЫ ПО КАТЕГОРИЯМ
             if (incomeStats.isNotEmpty()) {
                 item {
                     Text(
@@ -280,7 +334,6 @@ fun StatisticsScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                
                 items(incomeStats) { stat ->
                     CategoryBar(
                         category = stat.category,
@@ -293,7 +346,6 @@ fun StatisticsScreen(
                 }
             }
             
-            // ПУСТОЙ ЭКРАН
             if (expenseStats.isEmpty() && incomeStats.isEmpty()) {
                 item {
                     Column(
@@ -324,5 +376,47 @@ fun StatisticsScreen(
                 }
             }
         }
+    }
+}
+
+enum class Period {
+    WEEK, MONTH, QUARTER, YEAR
+}
+
+@Composable
+fun PeriodButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) 
+                MaterialTheme.colorScheme.primary 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isSelected) 
+                MaterialTheme.colorScheme.onPrimary 
+            else 
+                MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.height(36.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 0.dp
+        ),
+        contentPadding = PaddingValues(
+            horizontal = 2.dp,
+            vertical = 0.dp
+        )
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 12.sp,
+            maxLines = 1
+        )
     }
 }

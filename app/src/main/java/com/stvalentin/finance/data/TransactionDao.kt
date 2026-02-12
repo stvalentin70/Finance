@@ -10,7 +10,7 @@ interface TransactionDao {
     fun getAllTransactions(): Flow<List<Transaction>>
     
     @Query("SELECT * FROM transactions WHERE id = :id")
-    fun getTransactionById(id: Long): Flow<Transaction?> // ИЗМЕНИТЬ: suspend -> Flow
+    fun getTransactionById(id: Long): Flow<Transaction?>
     
     @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date DESC")
     fun getTransactionsByType(type: TransactionType): Flow<List<Transaction>>
@@ -55,6 +55,10 @@ interface TransactionDao {
         ORDER BY total DESC
     """)
     fun getCategoryStats(type: TransactionType): Flow<List<CategoryStat>>
+    
+    // НОВЫЙ МЕТОД: Получение транзакций за период
+    @Query("SELECT * FROM transactions WHERE date > :fromDate ORDER BY date ASC")
+    fun getTransactionsFromDate(fromDate: Long): Flow<List<Transaction>>
 }
 
 data class CategoryStat(
