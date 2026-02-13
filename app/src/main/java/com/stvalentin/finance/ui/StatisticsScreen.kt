@@ -19,6 +19,10 @@ import com.stvalentin.finance.data.TransactionType
 import java.text.NumberFormat
 import java.util.*
 
+enum class StatisticsPeriod {
+    WEEK, MONTH, QUARTER, YEAR
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(
@@ -40,7 +44,7 @@ fun StatisticsScreen(
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
     
-    var selectedPeriod by remember { mutableStateOf(Period.MONTH) }
+    var selectedPeriod by remember { mutableStateOf(StatisticsPeriod.MONTH) }
     
     Scaffold(
         topBar = {
@@ -57,7 +61,6 @@ fun StatisticsScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                // КНОПКА НАЗАД УБРАНА!
             )
         }
     ) { paddingValues ->
@@ -216,28 +219,28 @@ fun StatisticsScreen(
                             .padding(4.dp),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        PeriodButton(
+                        StatisticsPeriodButton(
                             text = "Неделя",
-                            isSelected = selectedPeriod == Period.WEEK,
-                            onClick = { selectedPeriod = Period.WEEK },
+                            isSelected = selectedPeriod == StatisticsPeriod.WEEK,
+                            onClick = { selectedPeriod = StatisticsPeriod.WEEK },
                             modifier = Modifier.weight(1f)
                         )
-                        PeriodButton(
+                        StatisticsPeriodButton(
                             text = "Месяц",
-                            isSelected = selectedPeriod == Period.MONTH,
-                            onClick = { selectedPeriod = Period.MONTH },
+                            isSelected = selectedPeriod == StatisticsPeriod.MONTH,
+                            onClick = { selectedPeriod = StatisticsPeriod.MONTH },
                             modifier = Modifier.weight(1f)
                         )
-                        PeriodButton(
+                        StatisticsPeriodButton(
                             text = "Квартал",
-                            isSelected = selectedPeriod == Period.QUARTER,
-                            onClick = { selectedPeriod = Period.QUARTER },
+                            isSelected = selectedPeriod == StatisticsPeriod.QUARTER,
+                            onClick = { selectedPeriod = StatisticsPeriod.QUARTER },
                             modifier = Modifier.weight(1f)
                         )
-                        PeriodButton(
+                        StatisticsPeriodButton(
                             text = "Год",
-                            isSelected = selectedPeriod == Period.YEAR,
-                            onClick = { selectedPeriod = Period.YEAR },
+                            isSelected = selectedPeriod == StatisticsPeriod.YEAR,
+                            onClick = { selectedPeriod = StatisticsPeriod.YEAR },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -490,12 +493,8 @@ fun StatisticsScreen(
     }
 }
 
-enum class Period {
-    WEEK, MONTH, QUARTER, YEAR
-}
-
 @Composable
-fun PeriodButton(
+fun StatisticsPeriodButton(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,

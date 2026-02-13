@@ -99,14 +99,8 @@ fun FinanceApp() {
                         }
                         
                         composable("settings") {
-                            // TODO: Экран настроек
-                            MainScreen(
-                                onAddTransactionClick = {
-                                    navController.navigate("add_transaction/0")
-                                },
-                                onTransactionClick = { transaction ->
-                                    navController.navigate("add_transaction/${transaction.id}")
-                                },
+                            SettingsScreen(
+                                navController = navController,
                                 viewModel = viewModel
                             )
                         }

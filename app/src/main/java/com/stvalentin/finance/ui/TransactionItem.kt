@@ -159,6 +159,9 @@ fun getCategoryIcon(category: String, type: TransactionType): ImageVector {
         "Инвестиции" -> Icons.Default.TrendingUp
         "Подарок" -> Icons.Default.CardGiftcard
         "Возврат долга" -> Icons.Default.SwapHoriz
+        "Связь" -> Icons.Default.Phone
+        "Перевод" -> Icons.Default.SwapHoriz
+        "Вклад" -> Icons.Default.AccountBalance
         
         // Расходы
         "Продукты" -> Icons.Default.ShoppingCart
@@ -166,12 +169,13 @@ fun getCategoryIcon(category: String, type: TransactionType): ImageVector {
         "Жилье" -> Icons.Default.Home
         "Кредиты" -> Icons.Default.CreditCard
         "Ипотека" -> Icons.Default.House
-        "Рассрочка" -> Icons.Default.ShoppingCart
         "Развлечения" -> Icons.Default.Movie
         "Здоровье" -> Icons.Default.LocalHospital
         "Одежда" -> Icons.Default.ShoppingBag
         "Образование" -> Icons.Default.School
         "Рестораны" -> Icons.Default.Restaurant
+        "Связь" -> Icons.Default.Phone
+        "Перевод" -> Icons.Default.SwapHoriz
         
         // По умолчанию
         else -> if (type == TransactionType.INCOME) 

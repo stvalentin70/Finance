@@ -1,5 +1,6 @@
 package com.stvalentin.finance.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -36,11 +37,11 @@ fun AddEditTransactionScreen(
     var showError by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     
-    // Дата
+    // Дата и время
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDateTimePicker by remember { mutableStateOf(false) }
     
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
+    val dateTimeFormat = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru")) }
     
     val isEditing = transactionId != null && transactionId != 0L
     val transaction by viewModel.getTransactionById(transactionId ?: 0).collectAsState(initial = null)
@@ -91,7 +92,32 @@ fun AddEditTransactionScreen(
                         IncomeGreen 
                     else 
                         ExpenseRed
-                )
+                ),
+                navigationIcon = {
+                    if (isEditing) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Удалить",
+                                tint = if (selectedType == TransactionType.INCOME) 
+                                    IncomeGreen 
+                                else 
+                                    ExpenseRed
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Назад",
+                                tint = if (selectedType == TransactionType.INCOME) 
+                                    IncomeGreen 
+                                else 
+                                    ExpenseRed
+                            )
+                        }
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -194,7 +220,7 @@ fun AddEditTransactionScreen(
                 singleLine = true
             )
             
-            // Дата
+            // Дата и время
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -204,7 +230,8 @@ fun AddEditTransactionScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(16.dp)
+                        .clickable { showDateTimePicker = true },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -213,19 +240,19 @@ fun AddEditTransactionScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Дата",
+                            contentDescription = "Дата и время",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Дата",
+                                text = "Дата и время",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = dateFormat.format(Date(selectedDate)),
+                                text = dateTimeFormat.format(Date(selectedDate)),
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     fontWeight = FontWeight.Medium
                                 )
@@ -233,16 +260,12 @@ fun AddEditTransactionScreen(
                         }
                     }
                     
-                    Button(
-                        onClick = { showDatePicker = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.height(36.dp)
-                    ) {
-                        Text("Выбрать", fontSize = 12.sp)
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Изменить",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
             
@@ -350,15 +373,15 @@ fun AddEditTransactionScreen(
         }
     }
     
-    // Диалог выбора даты
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDateSelected = { timestamp ->
+    // Диалог выбора даты и времени
+    if (showDateTimePicker) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
                 selectedDate = timestamp
-                showDatePicker = false
+                showDateTimePicker = false
             },
-            onDismiss = { showDatePicker = false },
-            initialDate = selectedDate
+            onDismiss = { showDateTimePicker = false },
+            initialDateTime = selectedDate
         )
     }
     

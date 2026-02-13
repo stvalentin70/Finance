@@ -23,43 +23,80 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class HistoryPeriod {
+    TODAY, WEEK, MONTH, YEAR, ALL_TIME
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     navController: NavController,
     viewModel: FinanceViewModel = viewModel()
 ) {
-    val transactions by viewModel.allTransactions.collectAsState()
+    val allTransactions by viewModel.allTransactions.collectAsState()
     
-    var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    // Состояния для фильтров
+    var selectedPeriod by remember { mutableStateOf(HistoryPeriod.ALL_TIME) }
+    var selectedType by remember { mutableStateOf<TransactionType?>(null) } // null = все операции
     
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
-    val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale("ru")) }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
     
-    // Фильтруем транзакции по выбранной дате
-    val transactionsForSelectedDate = remember(transactions, selectedDate) {
-        val startOfDay = getStartOfDay(selectedDate)
-        val endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1
+    // Фильтрация транзакций по периоду
+    val filteredByPeriod = remember(allTransactions, selectedPeriod) {
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance()
         
-        transactions.filter { transaction ->
-            transaction.date in startOfDay..endOfDay
-        }.sortedByDescending { it.date }
+        when (selectedPeriod) {
+            HistoryPeriod.TODAY -> {
+                val startOfDay = getStartOfDay(now)
+                val endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1
+                allTransactions.filter { it.date in startOfDay..endOfDay }
+            }
+            HistoryPeriod.WEEK -> {
+                calendar.timeInMillis = now
+                calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+                val startOfWeek = getStartOfDay(calendar.timeInMillis)
+                allTransactions.filter { it.date >= startOfWeek }
+            }
+            HistoryPeriod.MONTH -> {
+                calendar.timeInMillis = now
+                calendar.set(Calendar.DAY_OF_MONTH, 1)
+                val startOfMonth = getStartOfDay(calendar.timeInMillis)
+                allTransactions.filter { it.date >= startOfMonth }
+            }
+            HistoryPeriod.YEAR -> {
+                calendar.timeInMillis = now
+                calendar.set(Calendar.DAY_OF_YEAR, 1)
+                val startOfYear = getStartOfDay(calendar.timeInMillis)
+                allTransactions.filter { it.date >= startOfYear }
+            }
+            HistoryPeriod.ALL_TIME -> allTransactions
+        }
     }
     
-    // Подсчет доходов и расходов за выбранный день
-    val dailyIncome = remember(transactionsForSelectedDate) {
-        transactionsForSelectedDate
+    // Фильтрация по типу (доход/расход)
+    val filteredTransactions = remember(filteredByPeriod, selectedType) {
+        if (selectedType == null) {
+            filteredByPeriod
+        } else {
+            filteredByPeriod.filter { it.type == selectedType }
+        }
+    }.sortedByDescending { it.date }
+    
+    // Подсчет итогов за выбранный период
+    val periodIncome = remember(filteredByPeriod) {
+        filteredByPeriod
             .filter { it.type == TransactionType.INCOME }
             .sumOf { it.amount }
     }
     
-    val dailyExpenses = remember(transactionsForSelectedDate) {
-        transactionsForSelectedDate
+    val periodExpenses = remember(filteredByPeriod) {
+        filteredByPeriod
             .filter { it.type == TransactionType.EXPENSE }
             .sumOf { it.amount }
     }
+    
+    val periodBalance = periodIncome - periodExpenses
     
     Scaffold(
         topBar = {
@@ -86,7 +123,7 @@ fun HistoryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // КАРТОЧКА ВЫБОРА ДАТЫ
+            // 1. ПЕРИОД (ВСЕГДА ПЕРВЫМ)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -101,63 +138,64 @@ fun HistoryScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = monthYearFormat.format(Date(selectedDate)).uppercase(),
-                            style = MaterialTheme.typography.titleMedium.copy(
+                            text = "📅 ПЕРИОД",
+                            style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold
                             ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
+                        
+                        // Кнопки выбора периода
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            HistoryPeriodButton(
+                                text = "Сегодня",
+                                isSelected = selectedPeriod == HistoryPeriod.TODAY,
+                                onClick = { selectedPeriod = HistoryPeriod.TODAY },
+                                modifier = Modifier.weight(1f)
+                            )
+                            HistoryPeriodButton(
+                                text = "Неделя",
+                                isSelected = selectedPeriod == HistoryPeriod.WEEK,
+                                onClick = { selectedPeriod = HistoryPeriod.WEEK },
+                                modifier = Modifier.weight(1f)
+                            )
+                            HistoryPeriodButton(
+                                text = "Месяц",
+                                isSelected = selectedPeriod == HistoryPeriod.MONTH,
+                                onClick = { selectedPeriod = HistoryPeriod.MONTH },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarToday,
-                                    contentDescription = "Дата",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Выберите дату",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                    )
-                                    Text(
-                                        text = dateFormat.format(Date(selectedDate)),
-                                        style = MaterialTheme.typography.headlineSmall.copy(
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontSize = 24.sp
-                                    )
-                                }
-                            }
-                            
-                            Button(
-                                onClick = { showDatePicker = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Text("Изменить", fontSize = 14.sp)
-                            }
+                            HistoryPeriodButton(
+                                text = "Год",
+                                isSelected = selectedPeriod == HistoryPeriod.YEAR,
+                                onClick = { selectedPeriod = HistoryPeriod.YEAR },
+                                modifier = Modifier.weight(1f)
+                            )
+                            HistoryPeriodButton(
+                                text = "Всё время",
+                                isSelected = selectedPeriod == HistoryPeriod.ALL_TIME,
+                                onClick = { selectedPeriod = HistoryPeriod.ALL_TIME },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
             
-            // ИТОГИ ЗА ДЕНЬ
-            if (transactionsForSelectedDate.isNotEmpty()) {
+            // 2. ИТОГИ ЗА ПЕРИОД
+            if (filteredByPeriod.isNotEmpty()) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -171,14 +209,44 @@ fun HistoryScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
+                            val periodText = when (selectedPeriod) {
+                                HistoryPeriod.TODAY -> "СЕГОДНЯ"
+                                HistoryPeriod.WEEK -> "ЗА НЕДЕЛЮ"
+                                HistoryPeriod.MONTH -> "ЗА МЕСЯЦ"
+                                HistoryPeriod.YEAR -> "ЗА ГОД"
+                                HistoryPeriod.ALL_TIME -> "ЗА ВСЁ ВРЕМЯ"
+                            }
+                            
                             Text(
-                                text = "ИТОГИ ЗА ${dateFormat.format(Date(selectedDate)).uppercase()}",
+                                text = periodText,
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
+                            
+                            // Баланс за период
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Баланс:",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = currencyFormat.format(periodBalance),
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = if (periodBalance >= 0) IncomeGreen else ExpenseRed
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -206,15 +274,14 @@ fun HistoryScreen(
                                         )
                                     }
                                     Text(
-                                        text = currencyFormat.format(dailyIncome),
-                                        style = MaterialTheme.typography.titleLarge.copy(
+                                        text = currencyFormat.format(periodIncome),
+                                        style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold
                                         ),
                                         color = IncomeGreen
                                     )
                                 }
                                 
-                                // Вертикальный разделитель
                                 Divider(
                                     modifier = Modifier
                                         .height(40.dp)
@@ -244,8 +311,8 @@ fun HistoryScreen(
                                         )
                                     }
                                     Text(
-                                        text = currencyFormat.format(dailyExpenses),
-                                        style = MaterialTheme.typography.titleLarge.copy(
+                                        text = currencyFormat.format(periodExpenses),
+                                        style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold
                                         ),
                                         color = ExpenseRed
@@ -257,8 +324,118 @@ fun HistoryScreen(
                 }
             }
             
-            // ЗАГОЛОВОК СПИСКА
-            if (transactionsForSelectedDate.isNotEmpty()) {
+            // 3. ФИЛЬТР ПО ТИПУ (ВТОРЫМ)
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "📊 ТИП ОПЕРАЦИЙ",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Все операции
+                            FilterChip(
+                                selected = selectedType == null,
+                                onClick = { selectedType = null },
+                                label = { 
+                                    Text(
+                                        text = "Все",
+                                        fontSize = 13.sp
+                                    ) 
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )
+                            
+                            // Только доходы
+                            FilterChip(
+                                selected = selectedType == TransactionType.INCOME,
+                                onClick = { selectedType = TransactionType.INCOME },
+                                label = { 
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (selectedType == TransactionType.INCOME) 
+                                                Color.White else IncomeGreen
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Доходы",
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = IncomeGreen,
+                                    selectedLabelColor = Color.White,
+                                    labelColor = IncomeGreen
+                                )
+                            )
+                            
+                            // Только расходы
+                            FilterChip(
+                                selected = selectedType == TransactionType.EXPENSE,
+                                onClick = { selectedType = TransactionType.EXPENSE },
+                                label = { 
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDownward,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (selectedType == TransactionType.EXPENSE) 
+                                                Color.White else ExpenseRed
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Расходы",
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ExpenseRed,
+                                    selectedLabelColor = Color.White,
+                                    labelColor = ExpenseRed
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // 4. ЗАГОЛОВОК СПИСКА
+            if (filteredTransactions.isNotEmpty()) {
                 item {
                     Row(
                         modifier = Modifier
@@ -268,13 +445,13 @@ fun HistoryScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ОПЕРАЦИИ ЗА ${dateFormat.format(Date(selectedDate)).uppercase()}",
+                            text = "ОПЕРАЦИИ",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             )
                         )
                         Text(
-                            text = "${transactionsForSelectedDate.size} операций",
+                            text = "${filteredTransactions.size} ${getPluralForm(filteredTransactions.size)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -282,9 +459,9 @@ fun HistoryScreen(
                 }
             }
             
-            // СПИСОК ТРАНЗАКЦИЙ
-            if (transactionsForSelectedDate.isNotEmpty()) {
-                items(transactionsForSelectedDate) { transaction ->
+            // 5. СПИСОК ТРАНЗАКЦИЙ
+            if (filteredTransactions.isNotEmpty()) {
+                items(filteredTransactions) { transaction ->
                     HistoryTransactionItem(
                         transaction = transaction,
                         onTransactionClick = {
@@ -310,12 +487,16 @@ fun HistoryScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Нет операций за эту дату",
+                            text = when {
+                                filteredByPeriod.isEmpty() -> "Нет операций за выбранный период"
+                                selectedType != null -> "Нет ${if (selectedType == TransactionType.INCOME) "доходов" else "расходов"} за этот период"
+                                else -> "Нет операций"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
                         Text(
-                            text = "Выберите другую дату или добавьте новую операцию",
+                            text = "Измените параметры фильтрации или добавьте новую операцию",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
                             modifier = Modifier.padding(top = 8.dp)
@@ -341,16 +522,35 @@ fun HistoryScreen(
             }
         }
     }
-    
-    // ДИАЛОГ ВЫБОРА ДАТЫ
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDateSelected = { timestamp ->
-                selectedDate = timestamp
-                showDatePicker = false
-            },
-            onDismiss = { showDatePicker = false },
-            initialDate = selectedDate
+}
+
+@Composable
+fun HistoryPeriodButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(36.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) 
+                MaterialTheme.colorScheme.primary 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isSelected) 
+                MaterialTheme.colorScheme.onPrimary 
+            else 
+                MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        shape = RoundedCornerShape(8.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 12.sp
         )
     }
 }
@@ -362,6 +562,8 @@ fun HistoryTransactionItem(
     modifier: Modifier = Modifier
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale("ru")) }
     
     Card(
         modifier = modifier
@@ -408,19 +610,19 @@ fun HistoryTransactionItem(
                     )
                 }
                 
-                // Время операции
+                // Дата и время
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.AccessTime,
+                        imageVector = Icons.Default.CalendarToday,
                         contentDescription = null,
                         modifier = Modifier.size(12.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = transaction.formattedTime(),
+                        text = "${dateFormat.format(Date(transaction.date))} ${timeFormat.format(Date(transaction.date))}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -439,6 +641,7 @@ fun HistoryTransactionItem(
     }
 }
 
+// Вспомогательные функции
 private fun getStartOfDay(timestamp: Long): Long {
     val calendar = Calendar.getInstance()
     calendar.timeInMillis = timestamp
@@ -447,4 +650,12 @@ private fun getStartOfDay(timestamp: Long): Long {
     calendar.set(Calendar.SECOND, 0)
     calendar.set(Calendar.MILLISECOND, 0)
     return calendar.timeInMillis
+}
+
+private fun getPluralForm(count: Int): String {
+    return when {
+        count % 10 == 1 && count % 100 != 11 -> "операция"
+        count % 10 in 2..4 && count % 100 !in 12..14 -> "операции"
+        else -> "операций"
+    }
 }
