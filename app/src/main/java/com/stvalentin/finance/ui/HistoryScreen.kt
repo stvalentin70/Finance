@@ -32,7 +32,7 @@ fun HistoryScreen(
     val allTransactions by viewModel.allTransactions.collectAsState()
     
     // Состояния для фильтров
-    var selectedType by remember { mutableStateOf<TransactionType?>(null) } // null = все операции
+    var selectedType by remember { mutableStateOf<TransactionType?>(null) }
     
     // Состояния для выбора периода
     var useCustomPeriod by remember { mutableStateOf(false) }
@@ -49,11 +49,11 @@ fun HistoryScreen(
         if (useCustomPeriod) {
             allTransactions.filter { it.date in startDate..endDate }
         } else {
-            allTransactions // Всё время
+            allTransactions
         }
     }
     
-    // Фильтрация по типу (доход/расход)
+    // Фильтрация по типу
     val filteredTransactions = remember(filteredByPeriod, selectedType) {
         if (selectedType == null) {
             filteredByPeriod
@@ -62,7 +62,7 @@ fun HistoryScreen(
         }
     }.sortedByDescending { it.date }
     
-    // Подсчет итогов за выбранный период
+    // Подсчет итогов
     val periodIncome = remember(filteredByPeriod) {
         filteredByPeriod
             .filter { it.type == TransactionType.INCOME }
@@ -102,7 +102,7 @@ fun HistoryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. ПЕРИОД (ВСЕГДА ПЕРВЫМ)
+            // 1. ПЕРИОД
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -125,7 +125,6 @@ fun HistoryScreen(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
-                        // Переключатель "Всё время / Выбрать период"
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -164,11 +163,9 @@ fun HistoryScreen(
                             )
                         }
                         
-                        // Выбор дат периода (показывается только если включен кастомный период)
                         if (useCustomPeriod) {
                             Spacer(modifier = Modifier.height(16.dp))
                             
-                            // Начальная дата
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -209,7 +206,6 @@ fun HistoryScreen(
                                 )
                             }
                             
-                            // Конечная дата
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -284,7 +280,6 @@ fun HistoryScreen(
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
                             
-                            // Баланс за период
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -310,7 +305,6 @@ fun HistoryScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                // Доходы
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.weight(1f)
@@ -347,7 +341,6 @@ fun HistoryScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
                                 )
                                 
-                                // Расходы
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.weight(1f)
@@ -382,7 +375,7 @@ fun HistoryScreen(
                 }
             }
             
-            // 3. ФИЛЬТР ПО ТИПУ (ВТОРЫМ)
+            // 3. ФИЛЬТР ПО ТИПУ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -409,7 +402,7 @@ fun HistoryScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Все операции
+                            // Все операции - УМЕНЬШЕН ВЕС
                             FilterChip(
                                 selected = selectedType == null,
                                 onClick = { selectedType = null },
@@ -419,14 +412,14 @@ fun HistoryScreen(
                                         fontSize = 13.sp
                                     ) 
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(0.6f),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             )
                             
-                            // Только доходы
+                            // Только доходы - УВЕЛИЧЕН ВЕС
                             FilterChip(
                                 selected = selectedType == TransactionType.INCOME,
                                 onClick = { selectedType = TransactionType.INCOME },
@@ -445,11 +438,11 @@ fun HistoryScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = "Доходы",
-                                            fontSize = 12.sp
+                                            fontSize = 13.sp
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1.2f),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = IncomeGreen,
                                     selectedLabelColor = Color.White,
@@ -457,7 +450,7 @@ fun HistoryScreen(
                                 )
                             )
                             
-                            // Только расходы
+                            // Только расходы - УВЕЛИЧЕН ВЕС
                             FilterChip(
                                 selected = selectedType == TransactionType.EXPENSE,
                                 onClick = { selectedType = TransactionType.EXPENSE },
@@ -476,11 +469,11 @@ fun HistoryScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = "Расходы",
-                                            fontSize = 12.sp
+                                            fontSize = 13.sp
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1.2f),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = ExpenseRed,
                                     selectedLabelColor = Color.White,
@@ -529,7 +522,6 @@ fun HistoryScreen(
                     )
                 }
             } else {
-                // ПУСТОЙ ЭКРАН
                 item {
                     Column(
                         modifier = Modifier
@@ -581,7 +573,6 @@ fun HistoryScreen(
         }
     }
     
-    // Диалоги выбора дат
     if (showStartDatePicker) {
         DateTimePickerDialog(
             onDateTimeSelected = { timestamp ->
@@ -630,7 +621,6 @@ fun HistoryTransactionItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Иконка категории
             Icon(
                 imageVector = getCategoryIcon(transaction.category, transaction.type),
                 contentDescription = null,
@@ -640,7 +630,6 @@ fun HistoryTransactionItem(
             
             Spacer(modifier = Modifier.width(16.dp))
             
-            // Информация
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -660,7 +649,6 @@ fun HistoryTransactionItem(
                     )
                 }
                 
-                // Дата и время
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -679,7 +667,6 @@ fun HistoryTransactionItem(
                 }
             }
             
-            // Сумма
             Text(
                 text = "${if (transaction.type == TransactionType.INCOME) "+" else "-"}${currencyFormat.format(transaction.amount)}",
                 style = MaterialTheme.typography.titleMedium.copy(
@@ -691,7 +678,6 @@ fun HistoryTransactionItem(
     }
 }
 
-// Вспомогательные функции
 private fun getStartOfDay(timestamp: Long): Long {
     val calendar = Calendar.getInstance()
     calendar.timeInMillis = timestamp
