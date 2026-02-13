@@ -23,10 +23,6 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
-enum class HistoryPeriod {
-    TODAY, WEEK, MONTH, YEAR, ALL_TIME
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
@@ -36,41 +32,24 @@ fun HistoryScreen(
     val allTransactions by viewModel.allTransactions.collectAsState()
     
     // Состояния для фильтров
-    var selectedPeriod by remember { mutableStateOf(HistoryPeriod.ALL_TIME) }
     var selectedType by remember { mutableStateOf<TransactionType?>(null) } // null = все операции
     
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    // Состояния для выбора периода
+    var useCustomPeriod by remember { mutableStateOf(false) }
+    var startDate by remember { mutableStateOf(getStartOfMonth()) }
+    var endDate by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
     
-    // Фильтрация транзакций по периоду
-    val filteredByPeriod = remember(allTransactions, selectedPeriod) {
-        val now = System.currentTimeMillis()
-        val calendar = Calendar.getInstance()
-        
-        when (selectedPeriod) {
-            HistoryPeriod.TODAY -> {
-                val startOfDay = getStartOfDay(now)
-                val endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1
-                allTransactions.filter { it.date in startOfDay..endOfDay }
-            }
-            HistoryPeriod.WEEK -> {
-                calendar.timeInMillis = now
-                calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
-                val startOfWeek = getStartOfDay(calendar.timeInMillis)
-                allTransactions.filter { it.date >= startOfWeek }
-            }
-            HistoryPeriod.MONTH -> {
-                calendar.timeInMillis = now
-                calendar.set(Calendar.DAY_OF_MONTH, 1)
-                val startOfMonth = getStartOfDay(calendar.timeInMillis)
-                allTransactions.filter { it.date >= startOfMonth }
-            }
-            HistoryPeriod.YEAR -> {
-                calendar.timeInMillis = now
-                calendar.set(Calendar.DAY_OF_YEAR, 1)
-                val startOfYear = getStartOfDay(calendar.timeInMillis)
-                allTransactions.filter { it.date >= startOfYear }
-            }
-            HistoryPeriod.ALL_TIME -> allTransactions
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
+    
+    // Фильтрация транзакций по выбранному периоду
+    val filteredByPeriod = remember(allTransactions, useCustomPeriod, startDate, endDate) {
+        if (useCustomPeriod) {
+            allTransactions.filter { it.date in startDate..endDate }
+        } else {
+            allTransactions // Всё время
         }
     }
     
@@ -146,49 +125,130 @@ fun HistoryScreen(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
-                        // Кнопки выбора периода
+                        // Переключатель "Всё время / Выбрать период"
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            HistoryPeriodButton(
-                                text = "Сегодня",
-                                isSelected = selectedPeriod == HistoryPeriod.TODAY,
-                                onClick = { selectedPeriod = HistoryPeriod.TODAY },
-                                modifier = Modifier.weight(1f)
-                            )
-                            HistoryPeriodButton(
-                                text = "Неделя",
-                                isSelected = selectedPeriod == HistoryPeriod.WEEK,
-                                onClick = { selectedPeriod = HistoryPeriod.WEEK },
-                                modifier = Modifier.weight(1f)
-                            )
-                            HistoryPeriodButton(
-                                text = "Месяц",
-                                isSelected = selectedPeriod == HistoryPeriod.MONTH,
-                                onClick = { selectedPeriod = HistoryPeriod.MONTH },
-                                modifier = Modifier.weight(1f)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (useCustomPeriod) 
+                                        Icons.Default.DateRange 
+                                    else 
+                                        Icons.Default.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = if (useCustomPeriod) "Выбран период" else "Всё время",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                            
+                            Switch(
+                                checked = useCustomPeriod,
+                                onCheckedChange = { useCustomPeriod = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
                             )
                         }
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            HistoryPeriodButton(
-                                text = "Год",
-                                isSelected = selectedPeriod == HistoryPeriod.YEAR,
-                                onClick = { selectedPeriod = HistoryPeriod.YEAR },
-                                modifier = Modifier.weight(1f)
-                            )
-                            HistoryPeriodButton(
-                                text = "Всё время",
-                                isSelected = selectedPeriod == HistoryPeriod.ALL_TIME,
-                                onClick = { selectedPeriod = HistoryPeriod.ALL_TIME },
-                                modifier = Modifier.weight(1f)
-                            )
+                        // Выбор дат периода (показывается только если включен кастомный период)
+                        if (useCustomPeriod) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Начальная дата
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showStartDatePicker = true }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Начало",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = dateFormat.format(Date(startDate)),
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Изменить",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            
+                            // Конечная дата
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showEndDatePicker = true }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Конец",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = dateFormat.format(Date(endDate)),
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Изменить",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -209,12 +269,10 @@ fun HistoryScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            val periodText = when (selectedPeriod) {
-                                HistoryPeriod.TODAY -> "СЕГОДНЯ"
-                                HistoryPeriod.WEEK -> "ЗА НЕДЕЛЮ"
-                                HistoryPeriod.MONTH -> "ЗА МЕСЯЦ"
-                                HistoryPeriod.YEAR -> "ЗА ГОД"
-                                HistoryPeriod.ALL_TIME -> "ЗА ВСЁ ВРЕМЯ"
+                            val periodText = if (useCustomPeriod) {
+                                "${dateFormat.format(Date(startDate))} - ${dateFormat.format(Date(endDate))}"
+                            } else {
+                                "ЗА ВСЁ ВРЕМЯ"
                             }
                             
                             Text(
@@ -387,7 +445,7 @@ fun HistoryScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = "Доходы",
-                                            fontSize = 13.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                 },
@@ -418,7 +476,7 @@ fun HistoryScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = "Расходы",
-                                            fontSize = 13.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                 },
@@ -522,35 +580,27 @@ fun HistoryScreen(
             }
         }
     }
-}
-
-@Composable
-fun HistoryPeriodButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(36.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primary 
-            else 
-                MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (isSelected) 
-                MaterialTheme.colorScheme.onPrimary 
-            else 
-                MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        shape = RoundedCornerShape(8.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp
+    
+    // Диалоги выбора дат
+    if (showStartDatePicker) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                startDate = getStartOfDay(timestamp)
+                showStartDatePicker = false
+            },
+            onDismiss = { showStartDatePicker = false },
+            initialDateTime = startDate
+        )
+    }
+    
+    if (showEndDatePicker) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                endDate = getEndOfDay(timestamp)
+                showEndDatePicker = false
+            },
+            onDismiss = { showEndDatePicker = false },
+            initialDateTime = endDate
         )
     }
 }
@@ -645,6 +695,26 @@ fun HistoryTransactionItem(
 private fun getStartOfDay(timestamp: Long): Long {
     val calendar = Calendar.getInstance()
     calendar.timeInMillis = timestamp
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    return calendar.timeInMillis
+}
+
+private fun getEndOfDay(timestamp: Long): Long {
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = timestamp
+    calendar.set(Calendar.HOUR_OF_DAY, 23)
+    calendar.set(Calendar.MINUTE, 59)
+    calendar.set(Calendar.SECOND, 59)
+    calendar.set(Calendar.MILLISECOND, 999)
+    return calendar.timeInMillis
+}
+
+private fun getStartOfMonth(): Long {
+    val calendar = Calendar.getInstance()
+    calendar.set(Calendar.DAY_OF_MONTH, 1)
     calendar.set(Calendar.HOUR_OF_DAY, 0)
     calendar.set(Calendar.MINUTE, 0)
     calendar.set(Calendar.SECOND, 0)
