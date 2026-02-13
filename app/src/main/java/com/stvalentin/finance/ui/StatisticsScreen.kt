@@ -19,10 +19,6 @@ import com.stvalentin.finance.data.TransactionType
 import java.text.NumberFormat
 import java.util.*
 
-enum class StatisticsPeriod {
-    WEEK, MONTH, QUARTER, YEAR
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(
@@ -43,8 +39,6 @@ fun StatisticsScreen(
     val adviceMessage by viewModel.adviceMessage.collectAsState()
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
-    
-    var selectedPeriod by remember { mutableStateOf(StatisticsPeriod.MONTH) }
     
     Scaffold(
         topBar = {
@@ -103,7 +97,7 @@ fun StatisticsScreen(
                 }
             }
             
-            // АНАЛИТИКА
+            // АНАЛИТИКА ЗА МЕСЯЦ
             if (totalExpenses > 0) {
                 item {
                     Card(
@@ -202,48 +196,6 @@ fun StatisticsScreen(
                 // СОВЕТ
                 item {
                     AdviceCard(message = adviceMessage)
-                }
-            }
-            
-            // ПЕРИОДЫ
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        StatisticsPeriodButton(
-                            text = "Неделя",
-                            isSelected = selectedPeriod == StatisticsPeriod.WEEK,
-                            onClick = { selectedPeriod = StatisticsPeriod.WEEK },
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatisticsPeriodButton(
-                            text = "Месяц",
-                            isSelected = selectedPeriod == StatisticsPeriod.MONTH,
-                            onClick = { selectedPeriod = StatisticsPeriod.MONTH },
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatisticsPeriodButton(
-                            text = "Квартал",
-                            isSelected = selectedPeriod == StatisticsPeriod.QUARTER,
-                            onClick = { selectedPeriod = StatisticsPeriod.QUARTER },
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatisticsPeriodButton(
-                            text = "Год",
-                            isSelected = selectedPeriod == StatisticsPeriod.YEAR,
-                            onClick = { selectedPeriod = StatisticsPeriod.YEAR },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
             
@@ -490,43 +442,5 @@ fun StatisticsScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun StatisticsPeriodButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) 
-                MaterialTheme.colorScheme.primary 
-            else 
-                MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (isSelected) 
-                MaterialTheme.colorScheme.onPrimary 
-            else 
-                MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        shape = RoundedCornerShape(8.dp),
-        modifier = modifier.height(36.dp),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 0.dp
-        ),
-        contentPadding = PaddingValues(
-            horizontal = 2.dp,
-            vertical = 0.dp
-        )
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontSize = 12.sp,
-            maxLines = 1
-        )
     }
 }
