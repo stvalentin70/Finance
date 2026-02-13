@@ -178,6 +178,11 @@ fun getCategoryIcon(category: String, type: TransactionType): ImageVector {
         "Рестораны" -> Icons.Default.Restaurant
         "Связь" -> Icons.Default.Phone
         "Перевод" -> Icons.Default.SwapHoriz
+        "Интернет" -> Icons.Default.ShoppingCart
+        "Хозтовары" -> Icons.Default.Home
+        "Мебель" -> Icons.Default.Chair
+        "Электро" -> Icons.Default.Power
+        "Услуги" -> Icons.Default.MiscellaneousServices  // ← ИЗМЕНЕНО на универсальную иконку
         
         // По умолчанию
         else -> if (type == TransactionType.INCOME) 
