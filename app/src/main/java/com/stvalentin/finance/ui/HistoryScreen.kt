@@ -42,6 +42,9 @@ fun HistoryScreen(
     var showEndDatePicker by remember { mutableStateOf(false) }
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 2
+    currencyFormat.minimumFractionDigits = 2
+    
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
     
     // Фильтрация транзакций по выбранному периоду
@@ -402,7 +405,6 @@ fun HistoryScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Все операции - УМЕНЬШЕН ВЕС
                             FilterChip(
                                 selected = selectedType == null,
                                 onClick = { selectedType = null },
@@ -419,7 +421,6 @@ fun HistoryScreen(
                                 )
                             )
                             
-                            // Только доходы - УВЕЛИЧЕН ВЕС
                             FilterChip(
                                 selected = selectedType == TransactionType.INCOME,
                                 onClick = { selectedType = TransactionType.INCOME },
@@ -450,7 +451,6 @@ fun HistoryScreen(
                                 )
                             )
                             
-                            // Только расходы - УВЕЛИЧЕН ВЕС
                             FilterChip(
                                 selected = selectedType == TransactionType.EXPENSE,
                                 onClick = { selectedType = TransactionType.EXPENSE },
@@ -603,6 +603,9 @@ fun HistoryTransactionItem(
     modifier: Modifier = Modifier
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 2
+    currencyFormat.minimumFractionDigits = 2
+    
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale("ru")) }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale("ru")) }
     

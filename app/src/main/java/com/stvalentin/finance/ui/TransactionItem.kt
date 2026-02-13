@@ -26,6 +26,8 @@ fun TransactionItem(
     modifier: Modifier = Modifier
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 2
+    currencyFormat.minimumFractionDigits = 2
     
     Card(
         modifier = modifier

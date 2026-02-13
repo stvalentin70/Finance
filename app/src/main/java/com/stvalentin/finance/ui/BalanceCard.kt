@@ -5,10 +5,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.text.NumberFormat
+import java.util.*
 
 @Composable
 fun BalanceCard(
@@ -17,6 +20,10 @@ fun BalanceCard(
     expenses: Double,
     modifier: Modifier = Modifier
 ) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 2
+    currencyFormat.minimumFractionDigits = 2
+    
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -52,7 +59,7 @@ fun BalanceCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                     Text(
-                        text = "${balance} ₽",
+                        text = currencyFormat.format(balance),
                         style = MaterialTheme.typography.displayMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -98,7 +105,7 @@ fun BalanceCard(
                         )
                     }
                     Text(
-                        text = "${income} ₽",
+                        text = currencyFormat.format(income),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -136,7 +143,7 @@ fun BalanceCard(
                         )
                     }
                     Text(
-                        text = "${expenses} ₽",
+                        text = currencyFormat.format(expenses),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
