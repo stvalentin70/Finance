@@ -5,7 +5,14 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.stvalentin.finance.R
+import com.stvalentin.finance.data.AppDatabase
+import com.stvalentin.finance.data.Transaction
+import com.stvalentin.finance.data.TransactionType
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 class QuickInputActivity : AppCompatActivity() {
 
@@ -15,22 +22,9 @@ class QuickInputActivity : AppCompatActivity() {
     private lateinit var etAmount: EditText
     private lateinit var btnSave: Button
 
-    private var selectedType: String = "expense" // по умолчанию расход
+    private var selectedType: TransactionType = TransactionType.EXPENSE
 
-    // Жестко заданные категории (пока так)
-    private val incomeCategories = arrayOf(
-        "Зарплата", "Фриланс", "Инвестиции", 
-        "Подарок", "Возврат долга", "Связь", 
-        "Перевод", "Вклад", "Другое"
-    )
-    
-    private val expenseCategories = arrayOf(
-        "Продукты", "Транспорт", "Жилье", "Кредиты",
-        "Ипотека", "Развлечения", "Здоровье", "Одежда",
-        "Образование", "Рестораны", "Связь", "Перевод",
-        "Интернет покупки", "Хозтовары", "Мебель",
-        "Электротовары", "Услуги", "Другое"
-    )
+    private lateinit var database: AppDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,10 +38,12 @@ class QuickInputActivity : AppCompatActivity() {
         )
         window.setBackgroundDrawableResource(android.R.color.transparent)
 
+        // Инициализируем базу данных
+        database = AppDatabase.getDatabase(this)
+
         initViews()
         setupListeners()
         
-        // Устанавливаем начальное состояние (расход выбран)
         updateButtonStates()
         updateCategorySpinner()
     }
@@ -62,13 +58,13 @@ class QuickInputActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         btnIncome.setOnClickListener {
-            selectedType = "income"
+            selectedType = TransactionType.INCOME
             updateButtonStates()
             updateCategorySpinner()
         }
 
         btnExpense.setOnClickListener {
-            selectedType = "expense"
+            selectedType = TransactionType.EXPENSE
             updateButtonStates()
             updateCategorySpinner()
         }
@@ -78,26 +74,55 @@ class QuickInputActivity : AppCompatActivity() {
             val selectedCategory = spinnerCategory.selectedItem.toString()
             
             if (amountText.isNotEmpty()) {
-                val typeText = if (selectedType == "income") "Доход" else "Расход"
-                Toast.makeText(
-                    this, 
-                    "$typeText: $selectedCategory - $amountText ₽", 
-                    Toast.LENGTH_SHORT
-                ).show()
-                finish()
+                try {
+                    val amount = amountText.replace(',', '.').toDouble()
+                    if (amount > 0) {
+                        saveTransaction(amount, selectedCategory)
+                    } else {
+                        Toast.makeText(this, "Сумма должна быть больше 0", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: NumberFormatException) {
+                    Toast.makeText(this, "Некорректная сумма", Toast.LENGTH_SHORT).show()
+                }
             } else {
                 Toast.makeText(this, "Введите сумму", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
+    private fun saveTransaction(amount: Double, category: String) {
+        lifecycleScope.launch {
+            val transaction = Transaction(
+                type = selectedType,
+                category = category,
+                amount = amount,
+                description = "Быстрый ввод",
+                date = System.currentTimeMillis()
+            )
+            
+            database.transactionDao().insert(transaction)
+            
+            val typeText = if (selectedType == TransactionType.INCOME) "Доход" else "Расход"
+            val dateFormat = SimpleDateFormat("HH:mm", Locale("ru"))
+            val timeStr = dateFormat.format(Date())
+            
+            Toast.makeText(
+                this@QuickInputActivity,
+                "✅ $typeText: $category $amount ₽ ($timeStr)",
+                Toast.LENGTH_LONG
+            ).show()
+            
+            finish()
+        }
+    }
+
     private fun updateButtonStates() {
-        btnIncome.isSelected = selectedType == "income"
-        btnExpense.isSelected = selectedType == "expense"
+        btnIncome.isSelected = selectedType == TransactionType.INCOME
+        btnExpense.isSelected = selectedType == TransactionType.EXPENSE
     }
 
     private fun updateCategorySpinner() {
-        val categories = if (selectedType == "income") {
+        val categories = if (selectedType == TransactionType.INCOME) {
             incomeCategories
         } else {
             expenseCategories
@@ -110,5 +135,21 @@ class QuickInputActivity : AppCompatActivity() {
         )
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerCategory.adapter = adapter
+    }
+
+    companion object {
+        private val incomeCategories = arrayOf(
+            "Зарплата", "Фриланс", "Инвестиции", 
+            "Подарок", "Возврат долга", "Связь", 
+            "Перевод", "Вклад", "Другое"
+        )
+        
+        private val expenseCategories = arrayOf(
+            "Продукты", "Транспорт", "Жилье", "Кредиты",
+            "Ипотека", "Развлечения", "Здоровье", "Одежда",
+            "Образование", "Рестораны", "Связь", "Перевод",
+            "Интернет покупки", "Хозтовары", "Мебель",
+            "Электротовары", "Услуги", "Другое"
+        )
     }
 }
