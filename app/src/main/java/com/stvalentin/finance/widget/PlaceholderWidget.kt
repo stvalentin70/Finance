@@ -25,8 +25,13 @@ class PlaceholderWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
-        // Создаем Intent для открытия активности
-        val intent = Intent(context, PlaceholderActivity::class.java)
+        // ТЕПЕРЬ ОТКРЫВАЕМ QuickInputActivity вместо PlaceholderActivity
+        val intent = Intent(context, QuickInputActivity::class.java)
+        
+        // Важно! Эти флаги позволяют открыть поверх других приложений
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        
         val pendingIntent = PendingIntent.getActivity(
             context,
             appWidgetId,
@@ -34,13 +39,9 @@ class PlaceholderWidget : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Получаем макет виджета
         val views = RemoteViews(context.packageName, R.layout.widget_placeholder)
-
-        // Устанавливаем обработчик нажатия на весь виджет
         views.setOnClickPendingIntent(R.id.widget_placeholder, pendingIntent)
 
-        // Обновляем виджет
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 }
