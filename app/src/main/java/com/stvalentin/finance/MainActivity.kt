@@ -18,15 +18,40 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.work.*
 import com.stvalentin.finance.data.AppDatabase
 import com.stvalentin.finance.ui.*
+import com.stvalentin.finance.widget.KeepAliveWorker
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Запускаем фиктивный Worker при старте приложения
+        startKeepAliveWorker()
+        
         setContent {
             FinanceApp()
         }
+    }
+    
+    private fun startKeepAliveWorker() {
+        val workRequest = PeriodicWorkRequestBuilder<KeepAliveWorker>(24, TimeUnit.HOURS)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiresBatteryNotLow(false)
+                    .setRequiresCharging(false)
+                    .build()
+            )
+            .setInitialDelay(1, TimeUnit.HOURS) // Первый запуск через час
+            .build()
+        
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "keep_alive_worker",
+            ExistingPeriodicWorkPolicy.KEEP, // Не создавать новый, если уже есть
+            workRequest
+        )
     }
 }
 

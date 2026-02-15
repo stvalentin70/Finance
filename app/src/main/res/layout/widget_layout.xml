@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="2dp"
+    android:background="@drawable/widget_background">
+
+    <!-- Заголовок -->
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Трекер финансов"
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:textStyle="bold"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Расход: статика + динамика -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Расход: "
+            android:textSize="11sp"
+            android:textColor="@android:color/white"
+            android:alpha="0.9" />
+
+        <TextView
+            android:id="@+id/tv_expense_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 ₽"
+            android:textSize="11sp"
+            android:textColor="#F44336"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Доход: статика + динамика -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Доход: "
+            android:textSize="11sp"
+            android:textColor="@android:color/white"
+            android:alpha="0.9" />
+
+        <TextView
+            android:id="@+id/tv_income_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 ₽"
+            android:textSize="11sp"
+            android:textColor="#4CAF50"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Дата и время (полностью динамическое) -->
+    <TextView
+        android:id="@+id/tv_datetime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="13sp"
+        android:textColor="@android:color/white"
+        android:alpha="0.7"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="2dp" />
+
+</LinearLayout>

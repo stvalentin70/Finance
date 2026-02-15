@@ -47,24 +47,27 @@
             android:background="@drawable/button_expense" />
     </LinearLayout>
 
-    <!-- КАТЕГОРИЯ -->
+    <!-- СУММА (ТЕПЕРЬ СВЕРХУ) -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Категория:"
+        android:text="Сумма:"
         android:textSize="14sp"
         android:textColor="#666666"
         android:layout_marginBottom="4dp" />
 
-    <Spinner
-        android:id="@+id/spinner_category"
+    <EditText
+        android:id="@+id/et_amount"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_marginBottom="16dp"
-        android:background="@drawable/spinner_background"
-        android:padding="8dp" />
+        android:hint="0.00"
+        android:inputType="numberDecimal"
+        android:padding="12dp"
+        android:background="@drawable/edit_text_background"
+        android:textSize="16sp"
+        android:layout_marginBottom="16dp" />
 
-    <!-- ДАТА И ВРЕМЯ (КАК В ОСНОВНОМ ПРИЛОЖЕНИИ) -->
+    <!-- ДАТА И ВРЕМЯ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -110,25 +113,42 @@
         android:textColor="#999999"
         android:layout_marginBottom="16dp" />
 
-    <!-- СУММА -->
+    <!-- КАТЕГОРИЯ -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Сумма:"
+        android:text="Категория:"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:layout_marginBottom="4dp" />
+
+    <Spinner
+        android:id="@+id/spinner_category"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/spinner_background"
+        android:padding="8dp" />
+
+    <!-- ОПИСАНИЕ -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Описание:"
         android:textSize="14sp"
         android:textColor="#666666"
         android:layout_marginBottom="4dp" />
 
     <EditText
-        android:id="@+id/et_amount"
+        android:id="@+id/et_description"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:hint="0.00"
-        android:inputType="numberDecimal"
+        android:hint="Необязательно"
         android:padding="12dp"
         android:background="@drawable/edit_text_background"
-        android:textSize="16sp"
-        android:layout_marginBottom="24dp" />
+        android:textSize="14sp"
+        android:layout_marginBottom="24dp"
+        android:maxLines="1" />
 
     <!-- КНОПКА СОХРАНЕНИЯ -->
     <Button

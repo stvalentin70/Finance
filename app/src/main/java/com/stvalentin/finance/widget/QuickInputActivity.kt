@@ -2,6 +2,9 @@ package com.stvalentin.finance.widget
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Intent
 import android.os.Bundle
 import android.view.Window
 import android.view.WindowManager
@@ -21,6 +24,7 @@ class QuickInputActivity : AppCompatActivity() {
     private lateinit var btnIncome: Button
     private lateinit var btnExpense: Button
     private lateinit var spinnerCategory: Spinner
+    private lateinit var etDescription: EditText
     private lateinit var layoutDate: LinearLayout
     private lateinit var tvDate: TextView
     private lateinit var etAmount: EditText
@@ -60,6 +64,7 @@ class QuickInputActivity : AppCompatActivity() {
         btnIncome = findViewById(R.id.btn_income)
         btnExpense = findViewById(R.id.btn_expense)
         spinnerCategory = findViewById(R.id.spinner_category)
+        etDescription = findViewById(R.id.et_description)
         layoutDate = findViewById(R.id.layout_date)
         tvDate = findViewById(R.id.tv_date)
         etAmount = findViewById(R.id.et_amount)
@@ -86,12 +91,13 @@ class QuickInputActivity : AppCompatActivity() {
         btnSave.setOnClickListener {
             val amountText = etAmount.text.toString()
             val selectedCategory = spinnerCategory.selectedItem.toString()
+            val description = etDescription.text.toString()
             
             if (amountText.isNotEmpty()) {
                 try {
                     val amount = amountText.replace(',', '.').toDouble()
                     if (amount > 0) {
-                        saveTransaction(amount, selectedCategory)
+                        saveTransaction(amount, selectedCategory, description)
                     } else {
                         Toast.makeText(this, "Сумма должна быть больше 0", Toast.LENGTH_SHORT).show()
                     }
@@ -107,13 +113,11 @@ class QuickInputActivity : AppCompatActivity() {
     private fun showDateTimePicker() {
         calendar.timeInMillis = selectedDate
         
-        // Сначала выбираем дату
         DatePickerDialog(
             this,
             { _, year, month, dayOfMonth ->
                 calendar.set(year, month, dayOfMonth)
                 
-                // Затем выбираем время
                 TimePickerDialog(
                     this,
                     { _, hourOfDay, minute ->
@@ -137,17 +141,20 @@ class QuickInputActivity : AppCompatActivity() {
         tvDate.text = dateTimeFormat.format(Date(selectedDate))
     }
 
-    private fun saveTransaction(amount: Double, category: String) {
+    private fun saveTransaction(amount: Double, category: String, description: String) {
         lifecycleScope.launch {
             val transaction = Transaction(
                 type = selectedType,
                 category = category,
                 amount = amount,
-                description = "Быстрый ввод",
+                description = description,
                 date = selectedDate
             )
             
             database.transactionDao().insert(transaction)
+            
+            // ОБНОВЛЯЕМ ВИДЖЕТ
+            forceUpdateWidget()
             
             val typeText = if (selectedType == TransactionType.INCOME) "Доход" else "Расход"
             val dateStr = dateTimeFormat.format(Date(selectedDate))
@@ -159,6 +166,17 @@ class QuickInputActivity : AppCompatActivity() {
             ).show()
             
             finish()
+        }
+    }
+    
+    private fun forceUpdateWidget() {
+        val appWidgetManager = AppWidgetManager.getInstance(this)
+        val componentName = ComponentName(this, FinanceWidget::class.java)
+        val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+        
+        if (appWidgetIds.isNotEmpty()) {
+            // Создаем экземпляр виджета и вызываем forceUpdate
+            FinanceWidget().forceUpdate(this, appWidgetManager, appWidgetIds)
         }
     }
 
@@ -187,15 +205,17 @@ class QuickInputActivity : AppCompatActivity() {
         private val incomeCategories = arrayOf(
             "Зарплата", "Фриланс", "Инвестиции", 
             "Подарок", "Возврат долга", "Связь", 
-            "Перевод", "Вклад", "Другое"
+            "Перевод", "Вклад", "Дети",
+            "Другое"
         )
         
         private val expenseCategories = arrayOf(
             "Продукты", "Транспорт", "Жилье", "Кредиты",
             "Ипотека", "Развлечения", "Здоровье", "Одежда",
             "Образование", "Рестораны", "Связь", "Перевод",
-            "Интернет покупки", "Хозтовары", "Мебель",
-            "Электротовары", "Услуги", "Другое"
+            "Интернет", "Хозтовары", "Мебель", "Электро",
+            "Услуги", "Дети",
+            "Другое"
         )
     }
 }

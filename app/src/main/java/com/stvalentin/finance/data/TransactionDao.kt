@@ -9,17 +9,13 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY date DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
     
+    // ВАЖНО: НУЖЕН ЭТОТ МЕТОД!
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun getTransactionById(id: Long): Flow<Transaction?>
     
-    @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date DESC")
-    fun getTransactionsByType(type: TransactionType): Flow<List<Transaction>>
-    
-    @Query("SELECT * FROM transactions WHERE category = :category ORDER BY date DESC")
-    fun getTransactionsByCategory(category: String): Flow<List<Transaction>>
-    
+    // АСИНХРОННЫЙ МЕТОД ДЛЯ SUSPEND
     @Query("SELECT * FROM transactions WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC")
-    fun getTransactionsBetweenDates(startDate: Long, endDate: Long): Flow<List<Transaction>>
+    suspend fun getTransactionsBetweenDates(startDate: Long, endDate: Long): List<Transaction>
     
     @Insert
     suspend fun insert(transaction: Transaction): Long
@@ -55,10 +51,6 @@ interface TransactionDao {
         ORDER BY total DESC
     """)
     fun getCategoryStats(type: TransactionType): Flow<List<CategoryStat>>
-    
-    // НОВЫЙ МЕТОД: Получение транзакций за период
-    @Query("SELECT * FROM transactions WHERE date > :fromDate ORDER BY date ASC")
-    fun getTransactionsFromDate(fromDate: Long): Flow<List<Transaction>>
 }
 
 data class CategoryStat(

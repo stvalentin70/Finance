@@ -84,6 +84,9 @@ dependencies {
     // GraphView для графиков (оставим на будущее)
     implementation("com.jjoe64:graphview:4.2.2")
     
+    // WORK MANAGER - ДОБАВЛЕНО!
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    
     // Тестирование
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
