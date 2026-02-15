@@ -1,5 +1,8 @@
 package com.stvalentin.finance.ui
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -19,6 +23,7 @@ import androidx.navigation.NavController
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionCategories
 import com.stvalentin.finance.data.TransactionType
+import com.stvalentin.finance.widget.FinanceWidget
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,6 +34,7 @@ fun AddEditTransactionScreen(
     transactionId: Long? = null,
     viewModel: FinanceViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     var selectedType by remember { mutableStateOf(TransactionType.EXPENSE) }
     var amountText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
@@ -337,6 +343,8 @@ fun AddEditTransactionScreen(
                                     date = selectedDate
                                 )
                             }
+                            // Обновляем виджет после сохранения
+                            updateWidget(context)
                             navController.navigateUp()
                         } else {
                             showError = true
@@ -396,6 +404,7 @@ fun AddEditTransactionScreen(
                     onClick = {
                         viewModel.deleteTransaction(transaction!!)
                         showDeleteDialog = false
+                        updateWidget(context) // Обновляем виджет после удаления
                         navController.navigateUp()
                     }
                 ) {
@@ -408,5 +417,16 @@ fun AddEditTransactionScreen(
                 }
             }
         )
+    }
+}
+
+// Функция для обновления виджета
+private fun updateWidget(context: Context) {
+    val appWidgetManager = AppWidgetManager.getInstance(context)
+    val componentName = ComponentName(context, FinanceWidget::class.java)
+    val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+    
+    if (appWidgetIds.isNotEmpty()) {
+        FinanceWidget().forceUpdate(context, appWidgetManager, appWidgetIds)
     }
 }
