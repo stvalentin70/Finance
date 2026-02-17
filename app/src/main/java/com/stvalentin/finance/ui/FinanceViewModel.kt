@@ -179,25 +179,40 @@ class FinanceViewModel(
             StatsPeriod.ALL_TIME -> 0L
         }
         
-        // Загружаем данные
-        val income = transactionDao.getIncomeForPeriod(startDate, endDate)
-        val expenses = transactionDao.getExpensesForPeriod(startDate, endDate)
-        val balance = transactionDao.getBalanceForPeriod(startDate, endDate)
-        val expenseStats = transactionDao.getCategoryStatsForPeriod(TransactionType.EXPENSE, startDate, endDate)
-        val incomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, startDate, endDate)
-        val avgDailyExpense = transactionDao.getAverageDailyExpenseForPeriod(startDate, endDate)
-        
-        // Обновляем StateFlow
-        _periodIncome.value = income
-        _periodExpenses.value = expenses
-        _periodBalance.value = balance
-        _periodExpenseStats.value = expenseStats
-        _periodIncomeStats.value = incomeStats
-        _averageDailyExpensePeriod.value = avgDailyExpense
-        
-        // Находим топ категорию
-        _topExpenseCategoryPeriod.value = expenseStats.maxByOrNull { it.total }?.let {
-            it.category to it.total
+        try {
+            // Загружаем данные (теперь они гарантированно не null благодаря COALESCE)
+            val income = transactionDao.getIncomeForPeriod(startDate, endDate)
+            val expenses = transactionDao.getExpensesForPeriod(startDate, endDate)
+            val balance = transactionDao.getBalanceForPeriod(startDate, endDate)
+            val expenseStats = transactionDao.getCategoryStatsForPeriod(TransactionType.EXPENSE, startDate, endDate)
+            val incomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, startDate, endDate)
+            val avgDailyExpense = transactionDao.getAverageDailyExpenseForPeriod(startDate, endDate)
+            
+            // Обновляем StateFlow
+            _periodIncome.value = income
+            _periodExpenses.value = expenses
+            _periodBalance.value = balance
+            _periodExpenseStats.value = expenseStats
+            _periodIncomeStats.value = incomeStats
+            _averageDailyExpensePeriod.value = avgDailyExpense
+            
+            // Находим топ категорию
+            _topExpenseCategoryPeriod.value = expenseStats.maxByOrNull { it.total }?.let {
+                it.category to it.total
+            }
+            
+            Log.d("FinanceViewModel", "Статистика загружена: доход=$income, расход=$expenses")
+            
+        } catch (e: Exception) {
+            Log.e("FinanceViewModel", "Ошибка загрузки статистики", e)
+            // В случае ошибки устанавливаем пустые значения
+            _periodIncome.value = 0.0
+            _periodExpenses.value = 0.0
+            _periodBalance.value = 0.0
+            _periodExpenseStats.value = emptyList()
+            _periodIncomeStats.value = emptyList()
+            _averageDailyExpensePeriod.value = 0.0
+            _topExpenseCategoryPeriod.value = null
         }
     }
     
@@ -507,7 +522,7 @@ class FinanceViewModel(
         }
     }
     
-    // ========== СТАРЫЕ МЕТОДЫ ДЛЯ СТАТИСТИКИ (ОСТАВЛЯЕМ) ==========
+    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ (ОСТАВЛЯЕМ) ==========
     
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(

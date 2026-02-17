@@ -40,8 +40,7 @@ fun StatisticsScreen(
     val averageDailyExpense by viewModel.averageDailyExpensePeriod.collectAsState()
     val topExpenseCategory by viewModel.topExpenseCategoryPeriod.collectAsState()
     
-    // Для советов (оставляем старые)
-    val adviceMessage by viewModel.adviceMessage.collectAsState()
+    // График
     val balanceHistory by viewModel.balanceHistory.collectAsState()
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
@@ -125,7 +124,9 @@ fun StatisticsScreen(
                     ) {
                         Text(
                             text = "БАЛАНС ЗА ${periodNames[selectedPeriod]?.uppercase()}",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleSmall.copy(  // Изменено на titleSmall
+                                fontWeight = FontWeight.Bold
+                            ),
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -159,71 +160,84 @@ fun StatisticsScreen(
                         ),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                                .padding(16.dp)
                         ) {
-                            // Доходы
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Text(
+                                text = "ДОХОДЫ И РАСХОДЫ ЗА ${periodNames[selectedPeriod]?.uppercase()}",
+                                style = MaterialTheme.typography.titleSmall.copy(  // Изменено на titleSmall
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Доходы
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowUpward,
-                                        contentDescription = null,
-                                        tint = IncomeGreen,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = null,
+                                            tint = IncomeGreen,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Доходы",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = IncomeGreen
+                                        )
+                                    }
                                     Text(
-                                        text = "Доходы",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        text = currencyFormat.format(periodIncome),
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
                                         color = IncomeGreen
                                     )
                                 }
-                                Text(
-                                    text = currencyFormat.format(periodIncome),
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = IncomeGreen
+                                
+                                VerticalDivider(
+                                    modifier = Modifier.height(40.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant
                                 )
-                            }
-                            
-                            VerticalDivider(
-                                modifier = Modifier.height(40.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant
-                            )
-                            
-                            // Расходы
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
+                                
+                                // Расходы
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDownward,
-                                        contentDescription = null,
-                                        tint = ExpenseRed,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDownward,
+                                            contentDescription = null,
+                                            tint = ExpenseRed,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Расходы",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = ExpenseRed
+                                        )
+                                    }
                                     Text(
-                                        text = "Расходы",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        text = currencyFormat.format(periodExpenses),
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
                                         color = ExpenseRed
                                     )
                                 }
-                                Text(
-                                    text = currencyFormat.format(periodExpenses),
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = ExpenseRed
-                                )
                             }
                         }
                     }
@@ -301,11 +315,6 @@ fun StatisticsScreen(
                         }
                     }
                 }
-                
-                // СОВЕТ
-                item {
-                    AdviceCard(message = adviceMessage)
-                }
             }
             
             // ДИНАМИКА БАЛАНСА
@@ -322,10 +331,11 @@ fun StatisticsScreen(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = "Динамика баланса (30 дней)",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
+                                text = "ДИНАМИКА БАЛАНСА (30 ДНЕЙ)",
+                                style = MaterialTheme.typography.titleSmall.copy(  // Изменено на titleSmall
+                                    fontWeight = FontWeight.Bold
                                 ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                             BalanceChart(
@@ -342,65 +352,92 @@ fun StatisticsScreen(
                 item {
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 1.dp
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
             }
             
-            // РАСХОДЫ ПО КАТЕГОРИЯМ ЗА ПЕРИОД
+            // РАСХОДЫ ПО КАТЕГОРИЯМ
             if (periodExpenseStats.isNotEmpty()) {
                 item {
                     Text(
                         text = "РАСХОДЫ ПО КАТЕГОРИЯМ",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleSmall.copy(  // Изменено на titleSmall
+                            fontWeight = FontWeight.Bold
                         ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                items(periodExpenseStats) { stat ->
-                    CategoryBar(
-                        category = stat.category,
-                        amount = stat.total,
-                        total = periodExpenses,
-                        color = ExpenseRed,
-                        icon = getCategoryIcon(stat.category, TransactionType.EXPENSE)
-                    )
+                
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            periodExpenseStats.forEach { stat ->
+                                val percentage = (stat.total / periodExpenses * 100).toInt()
+                                CategoryStatItem(
+                                    category = stat.category,
+                                    amount = stat.total,
+                                    percentage = percentage,
+                                    color = ExpenseRed
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // МИНИМАЛЬНЫЙ ОТСТУП МЕЖДУ РАСХОДАМИ И ДОХОДАМИ
+            if (periodExpenseStats.isNotEmpty() && periodIncomeStats.isNotEmpty()) {
+                item {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
             
-            // РАЗДЕЛИТЕЛЬ
-            if (periodExpenseStats.isNotEmpty() && periodIncomeStats.isNotEmpty()) {
-                item {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-                }
-            }
-            
-            // ДОХОДЫ ПО КАТЕГОРИЯМ ЗА ПЕРИОД
+            // ДОХОДЫ ПО КАТЕГОРИЯМ
             if (periodIncomeStats.isNotEmpty()) {
                 item {
                     Text(
                         text = "ДОХОДЫ ПО КАТЕГОРИЯМ",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleSmall.copy(  // Изменено на titleSmall
+                            fontWeight = FontWeight.Bold
                         ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-                items(periodIncomeStats) { stat ->
-                    CategoryBar(
-                        category = stat.category,
-                        amount = stat.total,
-                        total = periodIncome,
-                        color = IncomeGreen,
-                        icon = getCategoryIcon(stat.category, TransactionType.INCOME)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            periodIncomeStats.forEach { stat ->
+                                val percentage = (stat.total / periodIncome * 100).toInt()
+                                CategoryStatItem(
+                                    category = stat.category,
+                                    amount = stat.total,
+                                    percentage = percentage,
+                                    color = IncomeGreen
+                                )
+                            }
+                        }
+                    }
                 }
             }
             
@@ -435,5 +472,38 @@ fun StatisticsScreen(
                 }
             }
         }
+    }
+}
+
+// Компонент для отображения категории
+@Composable
+fun CategoryStatItem(
+    category: String,
+    amount: Double,
+    percentage: Int,
+    color: androidx.compose.ui.graphics.Color
+) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp), // Минимальный отступ
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = category,
+            style = MaterialTheme.typography.bodyMedium, // Изменено на bodyMedium (14sp)
+            modifier = Modifier.weight(1f)
+        )
+        
+        Text(
+            text = "${currencyFormat.format(amount)} ($percentage%)",
+            style = MaterialTheme.typography.bodyMedium.copy( // Изменено на bodyMedium (14sp) жирный
+                fontWeight = FontWeight.Bold
+            ),
+            color = color
+        )
     }
 }

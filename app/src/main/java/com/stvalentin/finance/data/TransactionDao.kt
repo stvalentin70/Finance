@@ -41,7 +41,7 @@ interface TransactionDao {
     """)
     fun getBalance(): Flow<Double>
     
-    // НОВЫЕ МЕТОДЫ С ФИЛЬТРАЦИЕЙ ПО ДАТАМ
+    // НОВЫЕ МЕТОДЫ С ФИЛЬТРАЦИЕЙ ПО ДАТАМ (с COALESCE)
     @Query("""
         SELECT COALESCE(SUM(amount), 0) 
         FROM transactions 
@@ -79,7 +79,7 @@ interface TransactionDao {
     ): List<CategoryStat>
     
     @Query("""
-        SELECT AVG(amount) 
+        SELECT COALESCE(AVG(amount), 0) 
         FROM transactions 
         WHERE type = 1 AND date BETWEEN :startDate AND :endDate
     """)
