@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -228,16 +227,21 @@ fun FinanceApp() {
                             )
                         }
                         
-                        // НОВЫЙ МАРШРУТ ДЛЯ НАКОПЛЕНИЙ
+                        // НОВЫЕ МАРШРУТЫ ДЛЯ КОПИЛКИ
                         composable("savings") {
-                            // TODO: Создать экран накоплений
-                            Text("Экран накоплений (в разработке)")
+                            SavingsScreen(
+                                navController = navController,
+                                viewModel = viewModel
+                            )
                         }
                         
                         composable("add_saving/{savingId}") { backStackEntry ->
                             val savingId = backStackEntry.arguments?.getString("savingId")?.toLongOrNull()
-                            // TODO: Создать экран добавления накопления
-                            Text("Добавление накопления (в разработке)")
+                            AddEditSavingScreen(
+                                navController = navController,
+                                savingId = savingId,
+                                viewModel = viewModel
+                            )
                         }
                     }
                 }
