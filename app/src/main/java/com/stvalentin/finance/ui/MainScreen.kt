@@ -1,8 +1,10 @@
 package com.stvalentin.finance.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,17 +45,23 @@ fun MainScreen(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Плюс слева от названия
-                        IconButton(
-                            onClick = onAddTransactionClick,
-                            modifier = Modifier.size(40.dp)
+                        // Плюс на цветном кружке
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .clickable { onAddTransactionClick() },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Добавить транзакцию",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         
@@ -61,7 +70,10 @@ fun MainScreen(
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                         
                         // Шестеренка справа от названия
@@ -188,8 +200,6 @@ fun MainScreen(
                     }
                 }
             }
-            
-            // БЛОК НАКОПЛЕНИЙ УДАЛЕН
             
             // 2. БЛИЖАЙШИЕ ПЛАТЕЖИ (из календаря)
             if (payments.isNotEmpty()) {
