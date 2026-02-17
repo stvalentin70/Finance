@@ -7,11 +7,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.*
-import com.stvalentin.finance.data.RegularPayment
-import com.stvalentin.finance.data.RegularPaymentDao
-import com.stvalentin.finance.data.Transaction
-import com.stvalentin.finance.data.TransactionDao
-import com.stvalentin.finance.data.TransactionType
+import com.stvalentin.finance.data.*
 import com.stvalentin.finance.widget.FinanceWidget
 import com.stvalentin.finance.workers.PaymentReminderWorker
 import kotlinx.coroutines.flow.*
@@ -22,9 +18,11 @@ import java.util.concurrent.TimeUnit
 class FinanceViewModel(
     private val transactionDao: TransactionDao,
     private val regularPaymentDao: RegularPaymentDao,
+    private val savingDao: SavingDao,  // ← Добавлен SavingDao
     private val context: Context
 ) : ViewModel() {
     
+    // Транзакции
     val allTransactions = transactionDao.getAllTransactions()
         .stateIn(
             scope = viewModelScope,
@@ -57,6 +55,28 @@ class FinanceViewModel(
     private val _regularPayments = MutableStateFlow<List<RegularPayment>>(emptyList())
     val regularPayments: StateFlow<List<RegularPayment>> = _regularPayments.asStateFlow()
     
+    // ========== НАКОПЛЕНИЯ (SAVINGS) ==========
+    private val _allSavings = MutableStateFlow<List<Saving>>(emptyList())
+    val allSavings: StateFlow<List<Saving>> = _allSavings.asStateFlow()
+    
+    private val _totalSavings = MutableStateFlow(0.0)
+    val totalSavings: StateFlow<Double> = _totalSavings.asStateFlow()
+    
+    private val _savingsByCurrency = MutableStateFlow<Map<String, Double>>(emptyMap())
+    val savingsByCurrency: StateFlow<Map<String, Double>> = _savingsByCurrency.asStateFlow()
+    
+    // Баланс с учетом накоплений (свободные средства)
+    val availableBalance = combine(
+        balance,
+        totalSavings
+    ) { totalBalance, savings ->
+        totalBalance - savings
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
+    
     init {
         viewModelScope.launch {
             regularPaymentDao.getAllActivePayments()
@@ -64,22 +84,32 @@ class FinanceViewModel(
                     _regularPayments.value = payments
                 }
         }
+        
+        // Загружаем накопления
+        viewModelScope.launch {
+            savingDao.getAllSavings()
+                .collect { savings ->
+                    _allSavings.value = savings
+                    
+                    // Общая сумма всех накоплений
+                    val total = savings.sumOf { it.amount }
+                    _totalSavings.value = total
+                    
+                    // Сумма по валютам
+                    val byCurrency = savings
+                        .groupBy { it.currency }
+                        .mapValues { it.value.sumOf { it.amount } }
+                    _savingsByCurrency.value = byCurrency
+                }
+        }
+        
         // Запускаем Worker при создании ViewModel
         setupReminderWorker()
     }
     
+    // Транзакции
     fun getTransactionById(id: Long): Flow<Transaction?> {
         return transactionDao.getTransactionById(id)
-    }
-    
-    fun getRegularPaymentById(id: Long): Flow<RegularPayment?> {
-        return regularPaymentDao.getAllActivePayments()
-            .map { payments -> payments.find { it.id == id } }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = null
-            )
     }
     
     fun addTransaction(
@@ -121,6 +151,17 @@ class FinanceViewModel(
             transactionDao.deleteAll()
             updateWidget()
         }
+    }
+    
+    // Regular Payments
+    fun getRegularPaymentById(id: Long): Flow<RegularPayment?> {
+        return regularPaymentDao.getAllActivePayments()
+            .map { payments -> payments.find { it.id == id } }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null
+            )
     }
     
     fun addRegularPayment(
@@ -192,47 +233,188 @@ class FinanceViewModel(
         }
     }
     
-    private fun setupReminderWorker() {
-        val workManager = WorkManager.getInstance(context)
-        
-        // Отменяем старые Worker'ы
-        workManager.cancelUniqueWork("payment_reminders")
-        
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-            .build()
-        
-        // Запускаем каждые 15 минут для теста
-        val reminderRequest = PeriodicWorkRequestBuilder<PaymentReminderWorker>(
-            15, TimeUnit.MINUTES
-        ).setConstraints(constraints)
-         .setInitialDelay(1, TimeUnit.MINUTES)
-         .build()
-        
-        workManager.enqueueUniquePeriodicWork(
-            "payment_reminders",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            reminderRequest
-        )
-        
-        Log.d("FinanceViewModel", "Worker настроен на запуск каждые 15 минут")
+    // ========== МЕТОДЫ ДЛЯ НАКОПЛЕНИЙ ==========
+    
+    fun getSavingById(id: Long): Flow<Saving?> {
+        return allSavings.map { savings -> savings.find { it.id == id } }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null
+            )
     }
     
-    private fun updateWidget() {
-        try {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val componentName = ComponentName(context, FinanceWidget::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+    fun addSaving(
+        name: String,
+        category: String,
+        amount: Double,
+        currency: String = "RUB",
+        note: String = "",
+        targetAmount: Double? = null
+    ) {
+        viewModelScope.launch {
+            val saving = Saving(
+                name = name,
+                category = category,
+                amount = amount,
+                currency = currency,
+                note = note,
+                targetAmount = targetAmount,
+                dateCreated = System.currentTimeMillis(),
+                dateUpdated = System.currentTimeMillis(),
+                isActive = true
+            )
+            savingDao.insert(saving)
             
-            if (appWidgetIds.isNotEmpty()) {
-                FinanceWidget().forceUpdate(context, appWidgetManager, appWidgetIds)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            // Создаем транзакцию накопления (чтобы отслеживать движение денег)
+            val transaction = Transaction(
+                type = TransactionType.SAVING,
+                category = category,
+                amount = amount,
+                description = "Накопление: $name",
+                date = System.currentTimeMillis()
+            )
+            transactionDao.insert(transaction)
+            
+            updateWidget()
         }
     }
     
-    // Методы для статистики и советов
+    fun updateSaving(saving: Saving) {
+        viewModelScope.launch {
+            val updatedSaving = saving.copy(
+                dateUpdated = System.currentTimeMillis()
+            )
+            savingDao.update(updatedSaving)
+        }
+    }
+    
+    fun deleteSaving(saving: Saving) {
+        viewModelScope.launch {
+            savingDao.delete(saving)
+            
+            // Можно создать обратную транзакцию (возврат денег)
+            val transaction = Transaction(
+                type = TransactionType.INCOME,
+                category = saving.category,
+                amount = saving.amount,
+                description = "Возврат из накоплений: ${saving.name}",
+                date = System.currentTimeMillis()
+            )
+            transactionDao.insert(transaction)
+            
+            updateWidget()
+        }
+    }
+    
+    fun archiveSaving(id: Long) {
+        viewModelScope.launch {
+            savingDao.archiveSaving(id)
+        }
+    }
+    
+    fun addMoneyToSaving(savingId: Long, amount: Double) {
+        viewModelScope.launch {
+            val saving = savingDao.getSavingById(savingId)
+            if (saving != null) {
+                val updatedSaving = saving.copy(
+                    amount = saving.amount + amount,
+                    dateUpdated = System.currentTimeMillis()
+                )
+                savingDao.update(updatedSaving)
+                
+                // Создаем транзакцию накопления
+                val transaction = Transaction(
+                    type = TransactionType.SAVING,
+                    category = saving.category,
+                    amount = amount,
+                    description = "Пополнение: ${saving.name}",
+                    date = System.currentTimeMillis()
+                )
+                transactionDao.insert(transaction)
+                
+                updateWidget()
+            }
+        }
+    }
+    
+    fun withdrawFromSaving(savingId: Long, amount: Double) {
+        viewModelScope.launch {
+            val saving = savingDao.getSavingById(savingId)
+            if (saving != null && saving.amount >= amount) {
+                val updatedSaving = saving.copy(
+                    amount = saving.amount - amount,
+                    dateUpdated = System.currentTimeMillis()
+                )
+                savingDao.update(updatedSaving)
+                
+                // Создаем транзакцию дохода (возврат денег)
+                val transaction = Transaction(
+                    type = TransactionType.INCOME,
+                    category = saving.category,
+                    amount = amount,
+                    description = "Снятие из накоплений: ${saving.name}",
+                    date = System.currentTimeMillis()
+                )
+                transactionDao.insert(transaction)
+                
+                updateWidget()
+            }
+        }
+    }
+    
+    fun transferToSaving(
+        fromSavingId: Long?,
+        toSavingId: Long,
+        amount: Double,
+        description: String = "Перевод между накоплениями"
+    ) {
+        viewModelScope.launch {
+            val toSaving = savingDao.getSavingById(toSavingId)
+            
+            if (fromSavingId == null) {
+                // Перевод из свободных средств
+                if (toSaving != null) {
+                    val updatedToSaving = toSaving.copy(
+                        amount = toSaving.amount + amount,
+                        dateUpdated = System.currentTimeMillis()
+                    )
+                    savingDao.update(updatedToSaving)
+                    
+                    val transaction = Transaction(
+                        type = TransactionType.SAVING,
+                        category = toSaving.category,
+                        amount = amount,
+                        description = description,
+                        date = System.currentTimeMillis()
+                    )
+                    transactionDao.insert(transaction)
+                }
+            } else {
+                // Перевод между счетами
+                val fromSaving = savingDao.getSavingById(fromSavingId)
+                if (fromSaving != null && toSaving != null && fromSaving.amount >= amount) {
+                    val updatedFromSaving = fromSaving.copy(
+                        amount = fromSaving.amount - amount,
+                        dateUpdated = System.currentTimeMillis()
+                    )
+                    val updatedToSaving = toSaving.copy(
+                        amount = toSaving.amount + amount,
+                        dateUpdated = System.currentTimeMillis()
+                    )
+                    
+                    savingDao.update(updatedFromSaving)
+                    savingDao.update(updatedToSaving)
+                    
+                    // Можно создать транзакцию, но это не обязательно
+                }
+            }
+            updateWidget()
+        }
+    }
+    
+    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ ==========
+    
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(
             scope = viewModelScope,
@@ -246,6 +428,20 @@ class FinanceViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+    
+    fun getSavingStats() = allSavings
+        .map { savings ->
+            savings.groupBy { it.category }
+                .mapValues { it.value.sumOf { it.amount } }
+                .toList()
+                .sortedByDescending { it.second }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+    
+    // ========== МЕТОДЫ ДЛЯ РАСЧЕТОВ И СОВЕТОВ ==========
     
     val balanceHistory = allTransactions.combine(allTransactions) { transactions, _ ->
         calculateDailyBalance(transactions)
@@ -281,15 +477,50 @@ class FinanceViewModel(
     
     val adviceMessage = combine(
         topExpenseCategory,
-        expenseComparison
-    ) { topCategory, comparison ->
-        generateAdvice(topCategory, comparison)
+        expenseComparison,
+        totalSavings,
+        availableBalance
+    ) { topCategory, comparison, savings, available ->
+        generateAdvice(topCategory, comparison, savings, available)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = "Добавьте транзакции, чтобы получить рекомендации"
     )
     
+    private fun generateAdvice(
+        topCategory: Pair<String, Double>?,
+        comparison: Double,
+        totalSavings: Double,
+        availableBalance: Double
+    ): String {
+        return when {
+            topCategory == null && totalSavings == 0.0 -> 
+                "Добавьте транзакции и накопления для персональных рекомендаций"
+            
+            totalSavings == 0.0 -> {
+                "💰 Начните копить! У вас свободно ${"%.0f".format(availableBalance)} ₽. " +
+                "Отложите хотя бы 10% от этой суммы."
+            }
+            
+            totalSavings < 50000 -> {
+                "🏦 У вас ${"%.0f".format(totalSavings)} ₽ в накоплениях. " +
+                "До подушки безопасности (50 000 ₽) осталось ${"%.0f".format(50000 - totalSavings)} ₽"
+            }
+            
+            totalSavings < 100000 -> {
+                "💰 Хорошая подушка! У вас ${"%.0f".format(totalSavings)} ₽. " +
+                "Можно рассмотреть открытие вклада."
+            }
+            
+            else -> {
+                "📈 Отличные накопления! ${"%.0f".format(totalSavings)} ₽. " +
+                "Пора изучать инвестиционные инструменты."
+            }
+        }
+    }
+    
+    // Остальные методы без изменений
     private fun calculateDailyBalance(transactions: List<Transaction>): List<Pair<Long, Double>> {
         if (transactions.isEmpty()) return emptyList()
         
@@ -303,10 +534,10 @@ class FinanceViewModel(
         var runningBalance = 0.0
         
         recentTransactions.sortedBy { it.date }.forEach { transaction ->
-            runningBalance += if (transaction.type == TransactionType.INCOME) {
-                transaction.amount
-            } else {
-                -transaction.amount
+            runningBalance += when (transaction.type) {
+                TransactionType.INCOME -> transaction.amount
+                TransactionType.EXPENSE -> -transaction.amount
+                TransactionType.SAVING -> -transaction.amount // Накопления уменьшают свободный баланс
             }
             val dayStart = getStartOfDay(transaction.date)
             dailyBalances[dayStart] = runningBalance
@@ -403,29 +634,43 @@ class FinanceViewModel(
         } else 0.0
     }
     
-    private fun generateAdvice(
-        topCategory: Pair<String, Double>?,
-        comparison: Double
-    ): String {
-        return when {
-            topCategory == null -> "Добавьте транзакции, чтобы получить персональные рекомендации"
+    private fun setupReminderWorker() {
+        val workManager = WorkManager.getInstance(context)
+        
+        // Отменяем старые Worker'ы
+        workManager.cancelUniqueWork("payment_reminders")
+        
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .build()
+        
+        // Запускаем каждые 15 минут для теста
+        val reminderRequest = PeriodicWorkRequestBuilder<PaymentReminderWorker>(
+            15, TimeUnit.MINUTES
+        ).setConstraints(constraints)
+         .setInitialDelay(1, TimeUnit.MINUTES)
+         .build()
+        
+        workManager.enqueueUniquePeriodicWork(
+            "payment_reminders",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            reminderRequest
+        )
+        
+        Log.d("FinanceViewModel", "Worker настроен на запуск каждые 15 минут")
+    }
+    
+    private fun updateWidget() {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val componentName = ComponentName(context, FinanceWidget::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
             
-            comparison > 20 -> {
-                "🔴 Вы тратите на ${topCategory.first} на ${"%.0f".format(comparison)}% больше, " +
-                        "чем в прошлом месяце. Попробуйте установить лимит на эту категорию."
+            if (appWidgetIds.isNotEmpty()) {
+                FinanceWidget().forceUpdate(context, appWidgetManager, appWidgetIds)
             }
-            comparison > 5 -> {
-                "🟡 Расходы на ${topCategory.first} выросли на ${"%.0f".format(comparison)}% " +
-                        "по сравнению с прошлым месяцем. Следите за этой категорией."
-            }
-            comparison < -5 -> {
-                "🟢 Отличная работа! Расходы на ${topCategory.first} снизились на ${"%.0f".format(-comparison)}% " +
-                        "по сравнению с прошлым месяцем."
-            }
-            else -> {
-                "💡 Самая затратная категория: ${topCategory.first} - ${"%.0f".format(topCategory.second)} ₽. " +
-                        "Ваши расходы стабильны по сравнению с прошлым месяцем."
-            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
     

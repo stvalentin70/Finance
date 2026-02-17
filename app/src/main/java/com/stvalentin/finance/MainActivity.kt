@@ -136,11 +136,12 @@ fun FinanceApp() {
             val context = LocalContext.current
             val database = AppDatabase.getDatabase(context)
             
-            // Создаем ViewModel с обоими DAO и context
+            // Создаем ViewModel с тремя DAO и context
             val viewModel: FinanceViewModel = viewModel(
                 factory = FinanceViewModelFactory(
                     database.transactionDao(),
                     database.regularPaymentDao(),
+                    database.savingDao(),  // ← ДОБАВЛЕНО!
                     context
                 )
             )
