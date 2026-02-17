@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.stvalentin.finance.data.RegularPayment
-import com.stvalentin.finance.data.Saving
 import com.stvalentin.finance.data.Transaction
 import java.text.NumberFormat
 import java.util.*
@@ -33,9 +32,6 @@ fun MainScreen(
     val expenses by viewModel.totalExpenses.collectAsState()
     val advice by viewModel.adviceMessage.collectAsState()
     val payments by viewModel.regularPayments.collectAsState()
-    val allSavings by viewModel.allSavings.collectAsState()
-    val totalSavings by viewModel.totalSavings.collectAsState()
-    val savingsByCurrency by viewModel.savingsByCurrency.collectAsState()
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
     currencyFormat.maximumFractionDigits = 0
@@ -193,19 +189,9 @@ fun MainScreen(
                 }
             }
             
-            // 2. НАКОПЛЕНИЯ (УЛУЧШЕННЫЙ БЛОК)
-            item {
-                SavingsOverviewCard(
-                    totalSavings = totalSavings,
-                    savingsByCurrency = savingsByCurrency,
-                    recentSavings = allSavings.take(2),
-                    onCardClick = { navController.navigate("savings") },
-                    onAddClick = { navController.navigate("add_saving/0") },
-                    currencyFormat = currencyFormat
-                )
-            }
+            // БЛОК НАКОПЛЕНИЙ УДАЛЕН
             
-            // 3. БЛИЖАЙШИЕ ПЛАТЕЖИ (из календаря)
+            // 2. БЛИЖАЙШИЕ ПЛАТЕЖИ (из календаря)
             if (payments.isNotEmpty()) {
                 item {
                     UpcomingPaymentsSection(
@@ -220,7 +206,7 @@ fun MainScreen(
                 }
             }
             
-            // 4. СОВЕТ ДНЯ
+            // 3. СОВЕТ ДНЯ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -251,148 +237,6 @@ fun MainScreen(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun SavingsOverviewCard(
-    totalSavings: Double,
-    savingsByCurrency: Map<String, Double>,
-    recentSavings: List<Saving>,
-    onCardClick: () -> Unit,
-    onAddClick: () -> Unit,
-    currencyFormat: NumberFormat
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCardClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Заголовок с кнопкой добавления
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Savings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "НАКОПЛЕНИЯ",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
-                
-                IconButton(
-                    onClick = onAddClick,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AddCircle,
-                        contentDescription = "Добавить накопление",
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Общая сумма
-            Text(
-                text = "Всего: ${currencyFormat.format(totalSavings)}",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold
-                ),
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            // Распределение по валютам (заменяем FlowRow на обычный Row с Wrap)
-            if (savingsByCurrency.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    savingsByCurrency.entries.take(3).forEach { (currency, amount) ->
-                        AssistChip(
-                            onClick = { /* Показать детали по валюте */ },
-                            label = {
-                                Text("$currency: ${currencyFormat.format(amount)}")
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.1f)
-                            )
-                        )
-                    }
-                }
-            }
-            
-            // Последние накопления
-            if (recentSavings.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Последние:",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
-                )
-                
-                recentSavings.forEach { saving ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = saving.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Text(
-                            text = currencyFormat.format(saving.amount),
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                    }
-                }
-            }
-            
-            // Кнопка перехода
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = "Подробнее →",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                )
             }
         }
     }
