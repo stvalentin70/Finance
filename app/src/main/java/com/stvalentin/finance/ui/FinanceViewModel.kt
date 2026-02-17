@@ -15,10 +15,15 @@ import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
 
+// Перечисление для периодов
+enum class StatsPeriod {
+    WEEK, MONTH, YEAR, ALL_TIME
+}
+
 class FinanceViewModel(
     private val transactionDao: TransactionDao,
     private val regularPaymentDao: RegularPaymentDao,
-    private val savingDao: SavingDao,  // ← Добавлен SavingDao
+    private val savingDao: SavingDao,
     private val context: Context
 ) : ViewModel() {
     
@@ -77,6 +82,40 @@ class FinanceViewModel(
         initialValue = 0.0
     )
     
+    // ========== ДАННЫЕ ДЛЯ СТАТИСТИКИ С ФИЛЬТРОМ ==========
+    
+    // Текущий выбранный период
+    private val _selectedPeriod = MutableStateFlow(StatsPeriod.MONTH)
+    val selectedPeriod: StateFlow<StatsPeriod> = _selectedPeriod.asStateFlow()
+    
+    // Доход за выбранный период
+    private val _periodIncome = MutableStateFlow(0.0)
+    val periodIncome: StateFlow<Double> = _periodIncome.asStateFlow()
+    
+    // Расход за выбранный период
+    private val _periodExpenses = MutableStateFlow(0.0)
+    val periodExpenses: StateFlow<Double> = _periodExpenses.asStateFlow()
+    
+    // Баланс за выбранный период
+    private val _periodBalance = MutableStateFlow(0.0)
+    val periodBalance: StateFlow<Double> = _periodBalance.asStateFlow()
+    
+    // Расходы по категориям за период
+    private val _periodExpenseStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodExpenseStats: StateFlow<List<CategoryStat>> = _periodExpenseStats.asStateFlow()
+    
+    // Доходы по категориям за период
+    private val _periodIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodIncomeStats: StateFlow<List<CategoryStat>> = _periodIncomeStats.asStateFlow()
+    
+    // Средний расход в день за период
+    private val _averageDailyExpensePeriod = MutableStateFlow(0.0)
+    val averageDailyExpensePeriod: StateFlow<Double> = _averageDailyExpensePeriod.asStateFlow()
+    
+    // Топ категория за период
+    private val _topExpenseCategoryPeriod = MutableStateFlow<Pair<String, Double>?>(null)
+    val topExpenseCategoryPeriod: StateFlow<Pair<String, Double>?> = _topExpenseCategoryPeriod.asStateFlow()
+    
     init {
         viewModelScope.launch {
             regularPaymentDao.getAllActivePayments()
@@ -103,11 +142,67 @@ class FinanceViewModel(
                 }
         }
         
+        // Загружаем статистику при изменении периода
+        viewModelScope.launch {
+            _selectedPeriod.collect { period ->
+                loadStatsForPeriod(period)
+            }
+        }
+        
         // Запускаем Worker при создании ViewModel
         setupReminderWorker()
     }
     
-    // Транзакции
+    // ========== МЕТОДЫ ДЛЯ СМЕНЫ ПЕРИОДА ==========
+    
+    fun setStatsPeriod(period: StatsPeriod) {
+        _selectedPeriod.value = period
+    }
+    
+    private suspend fun loadStatsForPeriod(period: StatsPeriod) {
+        val calendar = Calendar.getInstance()
+        val endDate = calendar.timeInMillis
+        
+        val startDate = when (period) {
+            StatsPeriod.WEEK -> {
+                calendar.add(Calendar.DAY_OF_YEAR, -7)
+                calendar.timeInMillis
+            }
+            StatsPeriod.MONTH -> {
+                calendar.add(Calendar.MONTH, -1)
+                calendar.timeInMillis
+            }
+            StatsPeriod.YEAR -> {
+                calendar.add(Calendar.YEAR, -1)
+                calendar.timeInMillis
+            }
+            StatsPeriod.ALL_TIME -> 0L
+        }
+        
+        // Загружаем данные
+        val income = transactionDao.getIncomeForPeriod(startDate, endDate)
+        val expenses = transactionDao.getExpensesForPeriod(startDate, endDate)
+        val balance = transactionDao.getBalanceForPeriod(startDate, endDate)
+        val expenseStats = transactionDao.getCategoryStatsForPeriod(TransactionType.EXPENSE, startDate, endDate)
+        val incomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, startDate, endDate)
+        val avgDailyExpense = transactionDao.getAverageDailyExpenseForPeriod(startDate, endDate)
+        
+        // Обновляем StateFlow
+        _periodIncome.value = income
+        _periodExpenses.value = expenses
+        _periodBalance.value = balance
+        _periodExpenseStats.value = expenseStats
+        _periodIncomeStats.value = incomeStats
+        _averageDailyExpensePeriod.value = avgDailyExpense
+        
+        // Находим топ категорию
+        _topExpenseCategoryPeriod.value = expenseStats.maxByOrNull { it.total }?.let {
+            it.category to it.total
+        }
+    }
+    
+    // ========== СТАРЫЕ МЕТОДЫ ДЛЯ СОВМЕСТИМОСТИ ==========
+    
     fun getTransactionById(id: Long): Flow<Transaction?> {
         return transactionDao.getTransactionById(id)
     }
@@ -129,6 +224,8 @@ class FinanceViewModel(
             )
             transactionDao.insert(transaction)
             updateWidget()
+            // Перезагружаем статистику после добавления
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -136,6 +233,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.update(transaction)
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -143,6 +241,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.delete(transaction)
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -150,6 +249,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.deleteAll()
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -201,7 +301,6 @@ class FinanceViewModel(
     
     fun markPaymentAsPaid(payment: RegularPayment) {
         viewModelScope.launch {
-            // Создаем транзакцию расхода
             val transaction = Transaction(
                 type = TransactionType.EXPENSE,
                 category = payment.category,
@@ -211,16 +310,13 @@ class FinanceViewModel(
             )
             transactionDao.insert(transaction)
             
-            // Обновляем дату последнего платежа
             val calendar = Calendar.getInstance()
             val today = calendar.timeInMillis
             
-            // Вычисляем следующую дату платежа (следующий месяц)
             calendar.add(Calendar.MONTH, 1)
             calendar.set(Calendar.DAY_OF_MONTH, payment.dayOfMonth)
             val nextDue = calendar.timeInMillis
             
-            // Создаем обновленный платеж с новой датой
             val updatedPayment = payment.copy(
                 lastPaidDate = today,
                 nextDueDate = nextDue
@@ -228,8 +324,8 @@ class FinanceViewModel(
             
             regularPaymentDao.update(updatedPayment)
             
-            // Обновляем виджет
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -266,7 +362,6 @@ class FinanceViewModel(
             )
             savingDao.insert(saving)
             
-            // Создаем транзакцию накопления (чтобы отслеживать движение денег)
             val transaction = Transaction(
                 type = TransactionType.SAVING,
                 category = category,
@@ -277,6 +372,7 @@ class FinanceViewModel(
             transactionDao.insert(transaction)
             
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -293,7 +389,6 @@ class FinanceViewModel(
         viewModelScope.launch {
             savingDao.delete(saving)
             
-            // Можно создать обратную транзакцию (возврат денег)
             val transaction = Transaction(
                 type = TransactionType.INCOME,
                 category = saving.category,
@@ -304,6 +399,7 @@ class FinanceViewModel(
             transactionDao.insert(transaction)
             
             updateWidget()
+            loadStatsForPeriod(_selectedPeriod.value)
         }
     }
     
@@ -323,7 +419,6 @@ class FinanceViewModel(
                 )
                 savingDao.update(updatedSaving)
                 
-                // Создаем транзакцию накопления
                 val transaction = Transaction(
                     type = TransactionType.SAVING,
                     category = saving.category,
@@ -334,6 +429,7 @@ class FinanceViewModel(
                 transactionDao.insert(transaction)
                 
                 updateWidget()
+                loadStatsForPeriod(_selectedPeriod.value)
             }
         }
     }
@@ -348,7 +444,6 @@ class FinanceViewModel(
                 )
                 savingDao.update(updatedSaving)
                 
-                // Создаем транзакцию дохода (возврат денег)
                 val transaction = Transaction(
                     type = TransactionType.INCOME,
                     category = saving.category,
@@ -359,6 +454,7 @@ class FinanceViewModel(
                 transactionDao.insert(transaction)
                 
                 updateWidget()
+                loadStatsForPeriod(_selectedPeriod.value)
             }
         }
     }
@@ -373,7 +469,6 @@ class FinanceViewModel(
             val toSaving = savingDao.getSavingById(toSavingId)
             
             if (fromSavingId == null) {
-                // Перевод из свободных средств
                 if (toSaving != null) {
                     val updatedToSaving = toSaving.copy(
                         amount = toSaving.amount + amount,
@@ -389,9 +484,11 @@ class FinanceViewModel(
                         date = System.currentTimeMillis()
                     )
                     transactionDao.insert(transaction)
+                    
+                    updateWidget()
+                    loadStatsForPeriod(_selectedPeriod.value)
                 }
             } else {
-                // Перевод между счетами
                 val fromSaving = savingDao.getSavingById(fromSavingId)
                 if (fromSaving != null && toSaving != null && fromSaving.amount >= amount) {
                     val updatedFromSaving = fromSaving.copy(
@@ -405,15 +502,12 @@ class FinanceViewModel(
                     
                     savingDao.update(updatedFromSaving)
                     savingDao.update(updatedToSaving)
-                    
-                    // Можно создать транзакцию, но это не обязательно
                 }
             }
-            updateWidget()
         }
     }
     
-    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ ==========
+    // ========== СТАРЫЕ МЕТОДЫ ДЛЯ СТАТИСТИКИ (ОСТАВЛЯЕМ) ==========
     
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(
@@ -520,7 +614,6 @@ class FinanceViewModel(
         }
     }
     
-    // Остальные методы без изменений
     private fun calculateDailyBalance(transactions: List<Transaction>): List<Pair<Long, Double>> {
         if (transactions.isEmpty()) return emptyList()
         
@@ -537,7 +630,7 @@ class FinanceViewModel(
             runningBalance += when (transaction.type) {
                 TransactionType.INCOME -> transaction.amount
                 TransactionType.EXPENSE -> -transaction.amount
-                TransactionType.SAVING -> -transaction.amount // Накопления уменьшают свободный баланс
+                TransactionType.SAVING -> -transaction.amount
             }
             val dayStart = getStartOfDay(transaction.date)
             dailyBalances[dayStart] = runningBalance
@@ -637,14 +730,12 @@ class FinanceViewModel(
     private fun setupReminderWorker() {
         val workManager = WorkManager.getInstance(context)
         
-        // Отменяем старые Worker'ы
         workManager.cancelUniqueWork("payment_reminders")
         
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
         
-        // Запускаем каждые 15 минут для теста
         val reminderRequest = PeriodicWorkRequestBuilder<PaymentReminderWorker>(
             15, TimeUnit.MINUTES
         ).setConstraints(constraints)
