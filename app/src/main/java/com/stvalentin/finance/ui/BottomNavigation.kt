@@ -43,10 +43,10 @@ sealed class BottomNavItem(
         icon = Icons.Default.PieChart
     )
     
-    data object Settings : BottomNavItem(
-        route = "settings",
-        titleResId = R.string.settings_screen,
-        icon = Icons.Default.Settings
+    data object Savings : BottomNavItem(
+        route = "savings",
+        titleResId = R.string.savings_screen,
+        icon = Icons.Default.Savings
     )
 }
 
@@ -60,7 +60,7 @@ fun BottomNavigationBar(
         BottomNavItem.Calendar,
         BottomNavItem.History,
         BottomNavItem.Statistics,
-        BottomNavItem.Settings
+        BottomNavItem.Savings  // ← Вместо Settings
     )
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -94,7 +94,7 @@ fun BottomNavigationBar(
                 label = {
                     Text(
                         text = stringResource(id = item.titleResId),
-                        fontSize = 10.sp  // Уменьшено с 11sp до 10sp
+                        fontSize = 10.sp
                     )
                 },
                 alwaysShowLabel = true,
