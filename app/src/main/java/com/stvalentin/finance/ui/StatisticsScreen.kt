@@ -34,6 +34,12 @@ fun StatisticsScreen(
     // Режим и периоды
     val statsMode by viewModel.statsMode.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
+    
+    // Даты для обычного режима
+    val singleStart by viewModel.singleStart.collectAsState()
+    val singleEnd by viewModel.singleEnd.collectAsState()
+    
+    // Даты для режима сравнения
     val periodAStart by viewModel.periodAStart.collectAsState()
     val periodAEnd by viewModel.periodAEnd.collectAsState()
     val periodBStart by viewModel.periodBStart.collectAsState()
@@ -69,8 +75,26 @@ fun StatisticsScreen(
     
     // Состояния UI
     var expanded by remember { mutableStateOf(false) }
-    var showDatePickerA by remember { mutableStateOf(false) }
-    var showDatePickerB by remember { mutableStateOf(false) }
+    
+    // Состояния для выбора дат периода А
+    var showStartDatePickerA by remember { mutableStateOf(false) }
+    var showEndDatePickerA by remember { mutableStateOf(false) }
+    
+    // Состояния для выбора дат периода Б
+    var showStartDatePickerB by remember { mutableStateOf(false) }
+    var showEndDatePickerB by remember { mutableStateOf(false) }
+    
+    // Состояния для выбора дат обычного режима
+    var showStartDatePickerSingle by remember { mutableStateOf(false) }
+    var showEndDatePickerSingle by remember { mutableStateOf(false) }
+    
+    // Временные переменные для хранения выбранных дат
+    var tempStartA by remember { mutableStateOf(periodAStart) }
+    var tempEndA by remember { mutableStateOf(periodAEnd) }
+    var tempStartB by remember { mutableStateOf(periodBStart) }
+    var tempEndB by remember { mutableStateOf(periodBEnd) }
+    var tempStartSingle by remember { mutableStateOf(singleStart) }
+    var tempEndSingle by remember { mutableStateOf(singleEnd) }
     
     // Названия периодов
     val periodNames = mapOf(
@@ -149,6 +173,8 @@ fun StatisticsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             if (statsMode == StatsMode.SINGLE) {
+                // ========== ОБЫЧНЫЙ РЕЖИМ ==========
+                
                 // БАЛАНС ЗА ПЕРИОД
                 item {
                     Card(
@@ -188,6 +214,55 @@ fun StatisticsScreen(
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
                                 )
                             }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Кнопки выбора дат для обычного режима
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                OutlinedButton(
+                                    onClick = { 
+                                        tempStartSingle = singleStart
+                                        showStartDatePickerSingle = true 
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Event,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Начало", fontSize = 12.sp)
+                                }
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                OutlinedButton(
+                                    onClick = { 
+                                        tempEndSingle = singleEnd
+                                        showEndDatePickerSingle = true 
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Event,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Конец", fontSize = 12.sp)
+                                }
+                            }
+                            
+                            Text(
+                                text = "${dateFormat.format(Date(singleStart))} - ${dateFormat.format(Date(singleEnd))}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }
@@ -487,7 +562,7 @@ fun StatisticsScreen(
                     }
                 }
             } else {
-                // РЕЖИМ СРАВНЕНИЯ
+                // ========== РЕЖИМ СРАВНЕНИЯ ==========
                 
                 // ЗАГОЛОВОК СРАВНЕНИЯ
                 item {
@@ -513,10 +588,23 @@ fun StatisticsScreen(
                             )
                             
                             // Период А
+                            Text(
+                                text = "ПЕРИОД А",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                            
+                            // Начало периода А
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { showDatePickerA = true }
+                                    .clickable { 
+                                        tempStartA = periodAStart
+                                        showStartDatePickerA = true 
+                                    }
                                     .padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -525,14 +613,14 @@ fun StatisticsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CalendarToday,
+                                        imageVector = Icons.Default.Event,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Период А: ${dateFormat.format(Date(periodAStart))} - ${dateFormat.format(Date(periodAEnd))}",
+                                        text = "Начало: ${dateFormat.format(Date(periodAStart))}",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
@@ -544,11 +632,14 @@ fun StatisticsScreen(
                                 )
                             }
                             
-                            // Период Б
+                            // Конец периода А
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { showDatePickerB = true }
+                                    .clickable { 
+                                        tempEndA = periodAEnd
+                                        showEndDatePickerA = true 
+                                    }
                                     .padding(vertical = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -557,14 +648,14 @@ fun StatisticsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CalendarToday,
+                                        imageVector = Icons.Default.Event,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Период Б: ${dateFormat.format(Date(periodBStart))} - ${dateFormat.format(Date(periodBEnd))}",
+                                        text = "Конец: ${dateFormat.format(Date(periodAEnd))}",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
@@ -574,6 +665,114 @@ fun StatisticsScreen(
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
                                 )
+                            }
+                            
+                            // Разделитель
+                            Divider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                            
+                            // Период Б
+                            Text(
+                                text = "ПЕРИОД Б",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            
+                            // Начало периода Б
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { 
+                                        tempStartB = periodBStart
+                                        showStartDatePickerB = true 
+                                    }
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Event,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Начало: ${dateFormat.format(Date(periodBStart))}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Изменить",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            
+                            // Конец периода Б
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { 
+                                        tempEndB = periodBEnd
+                                        showEndDatePickerB = true 
+                                    }
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Event,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Конец: ${dateFormat.format(Date(periodBEnd))}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Изменить",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            
+                            // Кнопка сброса к значениям по умолчанию
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    viewModel.setStatsMode(StatsMode.COMPARE) // Это вызовет resetCompareDates()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Сбросить к текущему месяцу")
                             }
                         }
                     }
@@ -867,60 +1066,124 @@ fun StatisticsScreen(
         }
     }
     
-    // Диалоги выбора дат
-    if (showDatePickerA) {
+    // Диалоги выбора дат для обычного режима
+    if (showStartDatePickerSingle) {
         DateTimePickerDialog(
             onDateTimeSelected = { timestamp ->
+                // Устанавливаем начало дня для выбранной даты
                 val calendar = Calendar.getInstance()
                 calendar.timeInMillis = timestamp
-                calendar.set(Calendar.DAY_OF_MONTH, 1)
                 calendar.set(Calendar.HOUR_OF_DAY, 0)
                 calendar.set(Calendar.MINUTE, 0)
                 calendar.set(Calendar.SECOND, 0)
                 calendar.set(Calendar.MILLISECOND, 0)
                 val start = calendar.timeInMillis
                 
-                calendar.add(Calendar.MONTH, 1)
-                calendar.add(Calendar.DAY_OF_MONTH, -1)
-                calendar.set(Calendar.HOUR_OF_DAY, 23)
-                calendar.set(Calendar.MINUTE, 59)
-                calendar.set(Calendar.SECOND, 59)
-                calendar.set(Calendar.MILLISECOND, 999)
-                val end = calendar.timeInMillis
-                
-                viewModel.setPeriodADates(start, end)
-                showDatePickerA = false
+                viewModel.setSingleDates(start, singleEnd)
+                showStartDatePickerSingle = false
             },
-            onDismiss = { showDatePickerA = false },
-            initialDateTime = periodAStart
+            onDismiss = { showStartDatePickerSingle = false },
+            initialDateTime = tempStartSingle
         )
     }
     
-    if (showDatePickerB) {
+    if (showEndDatePickerSingle) {
         DateTimePickerDialog(
             onDateTimeSelected = { timestamp ->
+                // Устанавливаем конец дня для выбранной даты
                 val calendar = Calendar.getInstance()
                 calendar.timeInMillis = timestamp
-                calendar.set(Calendar.DAY_OF_MONTH, 1)
-                calendar.set(Calendar.HOUR_OF_DAY, 0)
-                calendar.set(Calendar.MINUTE, 0)
-                calendar.set(Calendar.SECOND, 0)
-                calendar.set(Calendar.MILLISECOND, 0)
-                val start = calendar.timeInMillis
-                
-                calendar.add(Calendar.MONTH, 1)
-                calendar.add(Calendar.DAY_OF_MONTH, -1)
                 calendar.set(Calendar.HOUR_OF_DAY, 23)
                 calendar.set(Calendar.MINUTE, 59)
                 calendar.set(Calendar.SECOND, 59)
                 calendar.set(Calendar.MILLISECOND, 999)
                 val end = calendar.timeInMillis
                 
-                viewModel.setPeriodBDates(start, end)
-                showDatePickerB = false
+                viewModel.setSingleDates(singleStart, end)
+                showEndDatePickerSingle = false
             },
-            onDismiss = { showDatePickerB = false },
-            initialDateTime = periodBStart
+            onDismiss = { showEndDatePickerSingle = false },
+            initialDateTime = tempEndSingle
+        )
+    }
+    
+    // Диалоги выбора дат для периода А
+    if (showStartDatePickerA) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                // Устанавливаем начало дня для выбранной даты
+                val calendar = Calendar.getInstance()
+                calendar.timeInMillis = timestamp
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                
+                viewModel.setPeriodADates(start, periodAEnd)
+                showStartDatePickerA = false
+            },
+            onDismiss = { showStartDatePickerA = false },
+            initialDateTime = tempStartA
+        )
+    }
+    
+    if (showEndDatePickerA) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                // Устанавливаем конец дня для выбранной даты
+                val calendar = Calendar.getInstance()
+                calendar.timeInMillis = timestamp
+                calendar.set(Calendar.HOUR_OF_DAY, 23)
+                calendar.set(Calendar.MINUTE, 59)
+                calendar.set(Calendar.SECOND, 59)
+                calendar.set(Calendar.MILLISECOND, 999)
+                val end = calendar.timeInMillis
+                
+                viewModel.setPeriodADates(periodAStart, end)
+                showEndDatePickerA = false
+            },
+            onDismiss = { showEndDatePickerA = false },
+            initialDateTime = tempEndA
+        )
+    }
+    
+    // Диалоги выбора дат для периода Б
+    if (showStartDatePickerB) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                val calendar = Calendar.getInstance()
+                calendar.timeInMillis = timestamp
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                
+                viewModel.setPeriodBDates(start, periodBEnd)
+                showStartDatePickerB = false
+            },
+            onDismiss = { showStartDatePickerB = false },
+            initialDateTime = tempStartB
+        )
+    }
+    
+    if (showEndDatePickerB) {
+        DateTimePickerDialog(
+            onDateTimeSelected = { timestamp ->
+                val calendar = Calendar.getInstance()
+                calendar.timeInMillis = timestamp
+                calendar.set(Calendar.HOUR_OF_DAY, 23)
+                calendar.set(Calendar.MINUTE, 59)
+                calendar.set(Calendar.SECOND, 59)
+                calendar.set(Calendar.MILLISECOND, 999)
+                val end = calendar.timeInMillis
+                
+                viewModel.setPeriodBDates(periodBStart, end)
+                showEndDatePickerB = false
+            },
+            onDismiss = { showEndDatePickerB = false },
+            initialDateTime = tempEndB
         )
     }
 }
@@ -944,44 +1207,57 @@ fun CompareRow(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        
-        Text(
-            text = currencyFormat.format(valueA),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = colorA,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
-        
-        Text(
-            text = "$sign$percentChange%",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = changeColor,
-            modifier = Modifier.width(60.dp)
-        )
-        
-        Text(
-            text = currencyFormat.format(valueB),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = colorB,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            
+            Text(
+                text = currencyFormat.format(valueA),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = colorA,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+            
+            Text(
+                text = "$sign$percentChange%",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = changeColor,
+                modifier = Modifier.width(60.dp)
+            )
+            
+            Text(
+                text = currencyFormat.format(valueB),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = colorB,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
     }
 }
 
@@ -1011,7 +1287,7 @@ fun CompareCategoryItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1073,7 +1349,7 @@ fun CategoryStatItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
