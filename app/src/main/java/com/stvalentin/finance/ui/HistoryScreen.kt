@@ -33,6 +33,7 @@ fun HistoryScreen(
     
     // Состояния для фильтров
     var selectedType by remember { mutableStateOf<TransactionType?>(null) }
+    var selectedCategory by remember { mutableStateOf("Все категории") }
     
     // Состояния для выбора периода
     var useCustomPeriod by remember { mutableStateOf(false) }
@@ -40,6 +41,21 @@ fun HistoryScreen(
     var endDate by remember { mutableStateOf(System.currentTimeMillis()) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
+    
+    // Состояние для диалога удаления
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
+    
+    // Состояние для выпадающего списка категорий
+    var expanded by remember { mutableStateOf(false) }
+    
+    // Получаем список всех уникальных категорий из транзакций
+    val allCategories = remember(allTransactions) {
+        listOf("Все категории") + allTransactions
+            .map { it.category }
+            .distinct()
+            .sorted()
+    }
     
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
     currencyFormat.maximumFractionDigits = 2
@@ -56,24 +72,33 @@ fun HistoryScreen(
         }
     }
     
-    // Фильтрация по типу
-    val filteredTransactions = remember(filteredByPeriod, selectedType) {
-        if (selectedType == null) {
+    // Фильтрация по категории
+    val filteredByCategory = remember(filteredByPeriod, selectedCategory) {
+        if (selectedCategory == "Все категории") {
             filteredByPeriod
         } else {
-            filteredByPeriod.filter { it.type == selectedType }
+            filteredByPeriod.filter { it.category == selectedCategory }
+        }
+    }
+    
+    // Фильтрация по типу
+    val filteredTransactions = remember(filteredByCategory, selectedType) {
+        if (selectedType == null) {
+            filteredByCategory
+        } else {
+            filteredByCategory.filter { it.type == selectedType }
         }
     }.sortedByDescending { it.date }
     
     // Подсчет итогов
-    val periodIncome = remember(filteredByPeriod) {
-        filteredByPeriod
+    val periodIncome = remember(filteredByCategory) {
+        filteredByCategory
             .filter { it.type == TransactionType.INCOME }
             .sumOf { it.amount }
     }
     
-    val periodExpenses = remember(filteredByPeriod) {
-        filteredByPeriod
+    val periodExpenses = remember(filteredByCategory) {
+        filteredByCategory
             .filter { it.type == TransactionType.EXPENSE }
             .sumOf { it.amount }
     }
@@ -105,7 +130,7 @@ fun HistoryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. ПЕРИОД
+            // 1. ПЕРИОД И КАТЕГОРИЯ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -249,12 +274,61 @@ fun HistoryScreen(
                                 )
                             }
                         }
+                        
+                        // Фильтр по категории
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = "📁 КАТЕГОРИЯ",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        ExposedDropdownMenuBox(
+                            expanded = expanded,
+                            onExpandedChange = { expanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedCategory,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Выберите категорию") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                            )
+                            
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                allCategories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { 
+                                            Text(
+                                                text = category,
+                                                fontWeight = if (category == selectedCategory) 
+                                                    FontWeight.Bold else FontWeight.Normal
+                                            ) 
+                                        },
+                                        onClick = {
+                                            selectedCategory = category
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
             
             // 2. ИТОГИ ЗА ПЕРИОД
-            if (filteredByPeriod.isNotEmpty()) {
+            if (filteredByCategory.isNotEmpty()) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -282,6 +356,15 @@ fun HistoryScreen(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
+                            
+                            if (selectedCategory != "Все категории") {
+                                Text(
+                                    text = "Категория: $selectedCategory",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
                             
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -518,6 +601,10 @@ fun HistoryScreen(
                         onTransactionClick = {
                             navController.navigate("add_transaction/${transaction.id}")
                         },
+                        onDeleteClick = {
+                            transactionToDelete = transaction
+                            showDeleteDialog = true
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -538,7 +625,8 @@ fun HistoryScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = when {
-                                filteredByPeriod.isEmpty() -> "Нет операций за выбранный период"
+                                filteredByCategory.isEmpty() -> "Нет операций за выбранный период"
+                                selectedCategory != "Все категории" -> "Нет операций в категории \"$selectedCategory\""
                                 selectedType != null -> "Нет ${if (selectedType == TransactionType.INCOME) "доходов" else "расходов"} за этот период"
                                 else -> "Нет операций"
                             },
@@ -573,6 +661,43 @@ fun HistoryScreen(
         }
     }
     
+    // Диалог подтверждения удаления
+    if (showDeleteDialog && transactionToDelete != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteDialog = false
+                transactionToDelete = null
+            },
+            title = {
+                Text(text = "Удалить транзакцию?")
+            },
+            text = {
+                Text(text = "Вы уверены, что хотите удалить эту транзакцию?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        transactionToDelete?.let { viewModel.deleteTransaction(it) }
+                        showDeleteDialog = false
+                        transactionToDelete = null
+                    }
+                ) {
+                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        transactionToDelete = null
+                    }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+    
     if (showStartDatePicker) {
         DateTimePickerDialog(
             onDateTimeSelected = { timestamp ->
@@ -600,6 +725,7 @@ fun HistoryScreen(
 fun HistoryTransactionItem(
     transaction: Transaction,
     onTransactionClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
@@ -675,8 +801,21 @@ fun HistoryTransactionItem(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
-                color = if (transaction.type == TransactionType.INCOME) IncomeGreen else ExpenseRed
+                color = if (transaction.type == TransactionType.INCOME) IncomeGreen else ExpenseRed,
+                modifier = Modifier.padding(end = 8.dp)
             )
+            
+            // Кнопка удаления
+            IconButton(
+                onClick = onDeleteClick
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Удалить",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

@@ -7,37 +7,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.stvalentin.finance.R
 
 sealed class BottomNavItem(
     val route: String,
-    val title: String,
+    val titleResId: Int,
     val icon: ImageVector
 ) {
     data object Main : BottomNavItem(
         route = "main",
-        title = "Главная",
+        titleResId = R.string.main_screen,
         icon = Icons.Default.Home
     )
     
-    data object Statistics : BottomNavItem(
-        route = "statistics",
-        title = "Статистика",
-        icon = Icons.Default.PieChart
+    data object Calendar : BottomNavItem(
+        route = "payment_calendar",
+        titleResId = R.string.calendar_screen,
+        icon = Icons.Default.CalendarToday
     )
     
     data object History : BottomNavItem(
         route = "history",
-        title = "История",
+        titleResId = R.string.history_screen,
         icon = Icons.Default.History
+    )
+    
+    data object Statistics : BottomNavItem(
+        route = "statistics",
+        titleResId = R.string.statistics_screen,
+        icon = Icons.Default.PieChart
     )
     
     data object Settings : BottomNavItem(
         route = "settings",
-        title = "Настройки",
+        titleResId = R.string.settings_screen,
         icon = Icons.Default.Settings
     )
 }
@@ -49,8 +57,9 @@ fun BottomNavigationBar(
 ) {
     val items = listOf(
         BottomNavItem.Main,
-        BottomNavItem.Statistics,
+        BottomNavItem.Calendar,
         BottomNavItem.History,
+        BottomNavItem.Statistics,
         BottomNavItem.Settings
     )
     
@@ -79,13 +88,13 @@ fun BottomNavigationBar(
                 icon = {
                     Icon(
                         imageVector = item.icon,
-                        contentDescription = item.title
+                        contentDescription = stringResource(id = item.titleResId)
                     )
                 },
                 label = {
                     Text(
-                        text = item.title,
-                        fontSize = 11.sp
+                        text = stringResource(id = item.titleResId),
+                        fontSize = 10.sp  // Уменьшено с 11sp до 10sp
                     )
                 },
                 alwaysShowLabel = true,

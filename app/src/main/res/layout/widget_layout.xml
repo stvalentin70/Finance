@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="2dp"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/widget_gradient_bg">
 
-    <!-- Заголовок -->
+    <!-- Заголовок с отступом -->
     <TextView
         android:id="@+id/tv_title"
         android:layout_width="wrap_content"
@@ -17,15 +17,17 @@
         android:textColor="@android:color/white"
         android:textStyle="bold"
         android:layout_marginTop="2dp"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="4dp"
+        android:layout_marginStart="2dp" />
 
-    <!-- Расход: статика + динамика -->
+    <!-- Расход: статика + динамика с отступом -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp">
+        android:layout_marginBottom="2dp"
+        android:layout_marginStart="2dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -45,13 +47,14 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Доход: статика + динамика -->
+    <!-- Доход: статика + динамика с отступом -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="2dp"
-        android:layout_marginBottom="2dp">
+        android:layout_marginBottom="2dp"
+        android:layout_marginStart="2dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -71,7 +74,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Дата и время (полностью динамическое) -->
+    <!-- Дата и время с отступом -->
     <TextView
         android:id="@+id/tv_datetime"
         android:layout_width="wrap_content"
@@ -81,6 +84,7 @@
         android:textColor="@android:color/white"
         android:alpha="0.7"
         android:layout_marginTop="4dp"
-        android:layout_marginBottom="2dp" />
+        android:layout_marginBottom="2dp"
+        android:layout_marginStart="2dp" />
 
 </LinearLayout>

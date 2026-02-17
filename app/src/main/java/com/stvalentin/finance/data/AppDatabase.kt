@@ -7,13 +7,15 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [Transaction::class],
-    version = 1,
+    entities = [Transaction::class, RegularPayment::class, Saving::class],  // ← Добавлен Saving
+    version = 3,  // ← Увеличена версия (было 2, стало 3)
     exportSchema = false
 )
-@TypeConverters(TransactionTypeConverter::class)
+@TypeConverters(TransactionTypeConverter::class, DateConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
+    abstract fun regularPaymentDao(): RegularPaymentDao
+    abstract fun savingDao(): SavingDao  // ← Добавлен новый DAO
     
     companion object {
         @Volatile
@@ -26,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "finance.db"
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration()  // Оставляем для простоты при изменении схемы
                 .build()
                 INSTANCE = instance
                 instance

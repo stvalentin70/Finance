@@ -2,7 +2,6 @@ package com.stvalentin.finance.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,8 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.stvalentin.finance.data.RegularPayment
 import com.stvalentin.finance.data.Transaction
-import java.text.SimpleDateFormat
+import java.text.NumberFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,22 +23,17 @@ import java.util.*
 fun MainScreen(
     onAddTransactionClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
-    viewModel: FinanceViewModel
+    viewModel: FinanceViewModel,
+    navController: NavController
 ) {
-    val transactions by viewModel.allTransactions.collectAsState()
     val balance by viewModel.balance.collectAsState()
     val income by viewModel.totalIncome.collectAsState()
     val expenses by viewModel.totalExpenses.collectAsState()
+    val advice by viewModel.adviceMessage.collectAsState()
+    val payments by viewModel.regularPayments.collectAsState()
     
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
-    
-    val groupedTransactions = remember(transactions) {
-        transactions.groupBy { transaction ->
-            val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("ru"))
-            dateFormat.format(Date(transaction.date))
-        }.toSortedMap(Comparator.reverseOrder())
-    }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 0
     
     Scaffold(
         topBar = {
@@ -54,7 +50,6 @@ fun MainScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                // КНОПКИ УБРАНЫ!
             )
         },
         floatingActionButton = {
@@ -68,147 +63,283 @@ fun MainScreen(
             }
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Карточка с балансом
-            BalanceCard(
-                balance = balance,
-                income = income,
-                expenses = expenses,
-                modifier = Modifier.padding(16.dp)
-            )
+            // 1. ФИНАНСОВЫЙ ОБЗОР
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "ФИНАНСОВЫЙ ОБЗОР",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Text(
+                            text = currencyFormat.format(balance),
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (balance >= 0) IncomeGreen else ExpenseRed,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = null,
+                                        tint = IncomeGreen,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Доходы",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Text(
+                                    text = currencyFormat.format(income),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = IncomeGreen
+                                )
+                            }
+                            
+                            VerticalDivider(
+                                modifier = Modifier.height(40.dp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
+                            )
+                            
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = null,
+                                        tint = ExpenseRed,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Расходы",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Text(
+                                    text = currencyFormat.format(expenses),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = ExpenseRed
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             
-            // Заголовок списка транзакций
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Text(
-                    text = "История операций",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-                
-                if (transactions.isNotEmpty()) {
-                    Text(
-                        text = "${transactions.size} операций",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
+            // 2. БЛИЖАЙШИЕ ПЛАТЕЖИ (из календаря)
+            if (payments.isNotEmpty()) {
+                item {
+                    UpcomingPaymentsSection(
+                        payments = payments,
+                        onViewAllClick = {
+                            navController.navigate("payment_calendar")
+                        },
+                        onPayNow = { payment ->
+                            viewModel.markPaymentAsPaid(payment)
+                        }
                     )
                 }
             }
             
-            // Список транзакций с группировкой
-            if (transactions.isEmpty()) {
-                // Пустой экран
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+            // 3. СОВЕТ ДНЯ
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountBalanceWallet,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Нет транзакций",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Text(
-                        text = "Нажмите + чтобы добавить первую транзакцию",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    groupedTransactions.forEach { (date, transactionsForDate) ->
-                        item {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = date,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
-                        }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(32.dp)
+                        )
                         
-                        items(transactionsForDate) { transaction ->
-                            TransactionItem(
-                                transaction = transaction,
-                                onTransactionClick = onTransactionClick,
-                                onDeleteClick = {
-                                    transactionToDelete = it
-                                    showDeleteDialog = true
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Text(
+                            text = advice,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
             }
         }
-        
-        // Диалог подтверждения удаления
-        if (showDeleteDialog && transactionToDelete != null) {
-            AlertDialog(
-                onDismissRequest = {
-                    showDeleteDialog = false
-                    transactionToDelete = null
-                },
-                title = {
-                    Text(text = "Удалить транзакцию?")
-                },
-                text = {
-                    Text(text = "Вы уверены, что хотите удалить эту транзакцию? Это действие нельзя отменить.")
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            transactionToDelete?.let { viewModel.deleteTransaction(it) }
-                            showDeleteDialog = false
-                            transactionToDelete = null
-                        }
+    }
+}
+
+@Composable
+fun UpcomingPaymentsSection(
+    payments: List<RegularPayment>,
+    onViewAllClick: () -> Unit,
+    onPayNow: (RegularPayment) -> Unit
+) {
+    val calendar = Calendar.getInstance()
+    val today = calendar.get(Calendar.DAY_OF_MONTH)
+    
+    // Фильтруем неоплаченные платежи на ближайшие дни
+    val upcomingPayments = payments
+        .filter { !it.isPaidThisMonth() && it.dayOfMonth >= today }
+        .sortedBy { it.dayOfMonth }
+        .take(3)
+    
+    if (upcomingPayments.isEmpty()) return
+    
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("ru", "RU")) }
+    currencyFormat.maximumFractionDigits = 0
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "📅 БЛИЖАЙШИЕ ПЛАТЕЖИ",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                TextButton(onClick = onViewAllClick) {
+                    Text("Все →", fontSize = 12.sp)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            upcomingPayments.forEach { payment ->
+                val dayDiff = payment.dayOfMonth - today
+                val dayText = when (dayDiff) {
+                    0 -> "Сегодня"
+                    1 -> "Завтра"
+                    else -> "Через $dayDiff дн."
+                }
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Удалить", color = MaterialTheme.colorScheme.error)
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = payment.name,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                            Text(
+                                text = dayText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteDialog = false
-                            transactionToDelete = null
-                        }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Отмена")
+                        Text(
+                            text = currencyFormat.format(payment.amount),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = ExpenseRed,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        
+                        Button(
+                            onClick = { onPayNow(payment) },
+                            modifier = Modifier.height(32.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = IncomeGreen
+                            )
+                        ) {
+                            Text("Оплатить", fontSize = 10.sp)
+                        }
                     }
                 }
-            )
+                
+                if (payment != upcomingPayments.last()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                    )
+                }
+            }
         }
     }
 }

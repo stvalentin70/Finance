@@ -1,18 +1,29 @@
 package com.stvalentin.finance.ui
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.*
+import com.stvalentin.finance.data.RegularPayment
+import com.stvalentin.finance.data.RegularPaymentDao
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionDao
 import com.stvalentin.finance.data.TransactionType
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import com.stvalentin.finance.widget.FinanceWidget
+import com.stvalentin.finance.workers.PaymentReminderWorker
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.*
+import java.util.concurrent.TimeUnit
 
-class FinanceViewModel(private val transactionDao: TransactionDao) : ViewModel() {
+class FinanceViewModel(
+    private val transactionDao: TransactionDao,
+    private val regularPaymentDao: RegularPaymentDao,
+    private val context: Context
+) : ViewModel() {
     
     val allTransactions = transactionDao.getAllTransactions()
         .stateIn(
@@ -42,11 +53,35 @@ class FinanceViewModel(private val transactionDao: TransactionDao) : ViewModel()
             initialValue = 0.0
         )
     
+    // Regular Payments
+    private val _regularPayments = MutableStateFlow<List<RegularPayment>>(emptyList())
+    val regularPayments: StateFlow<List<RegularPayment>> = _regularPayments.asStateFlow()
+    
+    init {
+        viewModelScope.launch {
+            regularPaymentDao.getAllActivePayments()
+                .collect { payments ->
+                    _regularPayments.value = payments
+                }
+        }
+        // Запускаем Worker при создании ViewModel
+        setupReminderWorker()
+    }
+    
     fun getTransactionById(id: Long): Flow<Transaction?> {
         return transactionDao.getTransactionById(id)
     }
     
-    // ПОЛНЫЙ МЕТОД с параметром date
+    fun getRegularPaymentById(id: Long): Flow<RegularPayment?> {
+        return regularPaymentDao.getAllActivePayments()
+            .map { payments -> payments.find { it.id == id } }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null
+            )
+    }
+    
     fun addTransaction(
         type: TransactionType,
         category: String,
@@ -63,27 +98,141 @@ class FinanceViewModel(private val transactionDao: TransactionDao) : ViewModel()
                 date = date
             )
             transactionDao.insert(transaction)
+            updateWidget()
         }
     }
     
     fun updateTransaction(transaction: Transaction) {
         viewModelScope.launch {
             transactionDao.update(transaction)
+            updateWidget()
         }
     }
     
     fun deleteTransaction(transaction: Transaction) {
         viewModelScope.launch {
             transactionDao.delete(transaction)
+            updateWidget()
         }
     }
     
     fun deleteAllTransactions() {
         viewModelScope.launch {
             transactionDao.deleteAll()
+            updateWidget()
         }
     }
     
+    fun addRegularPayment(
+        name: String,
+        category: String,
+        amount: Double,
+        dayOfMonth: Int,
+        reminderDays: Int = 1,
+        description: String = ""
+    ) {
+        viewModelScope.launch {
+            val payment = RegularPayment(
+                name = name,
+                category = category,
+                amount = amount,
+                dayOfMonth = dayOfMonth,
+                reminderDays = reminderDays,
+                description = description,
+                isActive = true
+            )
+            regularPaymentDao.insert(payment)
+            setupReminderWorker()
+        }
+    }
+    
+    fun updateRegularPayment(payment: RegularPayment) {
+        viewModelScope.launch {
+            regularPaymentDao.update(payment)
+        }
+    }
+    
+    fun deleteRegularPayment(payment: RegularPayment) {
+        viewModelScope.launch {
+            regularPaymentDao.delete(payment)
+        }
+    }
+    
+    fun markPaymentAsPaid(payment: RegularPayment) {
+        viewModelScope.launch {
+            // Создаем транзакцию расхода
+            val transaction = Transaction(
+                type = TransactionType.EXPENSE,
+                category = payment.category,
+                amount = payment.amount,
+                description = "Регулярный платеж: ${payment.name}",
+                date = System.currentTimeMillis()
+            )
+            transactionDao.insert(transaction)
+            
+            // Обновляем дату последнего платежа
+            val calendar = Calendar.getInstance()
+            val today = calendar.timeInMillis
+            
+            // Вычисляем следующую дату платежа (следующий месяц)
+            calendar.add(Calendar.MONTH, 1)
+            calendar.set(Calendar.DAY_OF_MONTH, payment.dayOfMonth)
+            val nextDue = calendar.timeInMillis
+            
+            // Создаем обновленный платеж с новой датой
+            val updatedPayment = payment.copy(
+                lastPaidDate = today,
+                nextDueDate = nextDue
+            )
+            
+            regularPaymentDao.update(updatedPayment)
+            
+            // Обновляем виджет
+            updateWidget()
+        }
+    }
+    
+    private fun setupReminderWorker() {
+        val workManager = WorkManager.getInstance(context)
+        
+        // Отменяем старые Worker'ы
+        workManager.cancelUniqueWork("payment_reminders")
+        
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .build()
+        
+        // Запускаем каждые 15 минут для теста
+        val reminderRequest = PeriodicWorkRequestBuilder<PaymentReminderWorker>(
+            15, TimeUnit.MINUTES
+        ).setConstraints(constraints)
+         .setInitialDelay(1, TimeUnit.MINUTES)
+         .build()
+        
+        workManager.enqueueUniquePeriodicWork(
+            "payment_reminders",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            reminderRequest
+        )
+        
+        Log.d("FinanceViewModel", "Worker настроен на запуск каждые 15 минут")
+    }
+    
+    private fun updateWidget() {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val componentName = ComponentName(context, FinanceWidget::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            
+            if (appWidgetIds.isNotEmpty()) {
+                FinanceWidget().forceUpdate(context, appWidgetManager, appWidgetIds)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    // Методы для статистики и советов
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(
             scope = viewModelScope,

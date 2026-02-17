@@ -30,7 +30,7 @@ data class Transaction(
 }
 
 enum class TransactionType {
-    INCOME, EXPENSE
+    INCOME, EXPENSE, SAVING  // ← ДОБАВЛЕНО SAVING
 }
 
 object TransactionCategories {
@@ -43,7 +43,7 @@ object TransactionCategories {
         "Связь",
         "Перевод",
         "Вклад",
-        "Дети",      // ← ДОБАВЛЕНО
+        "Дети",
         "Другое"
     )
     
@@ -65,7 +65,22 @@ object TransactionCategories {
         "Мебель",
         "Электро",
         "Услуги",
-        "Дети",      // ← ДОБАВЛЕНО
+        "Дети",
+        "Другое"
+    )
+    
+    // Новые категории для накоплений
+    val savingCategories = listOf(
+        "Наличные ₽",
+        "Вклад ₽",
+        "Доллар \$",
+        "Евро €",
+        "Акции",
+        "Облигации",
+        "ETF",
+        "Криптовалюта",
+        "Драгоценные металлы",
+        "Недвижимость",
         "Другое"
     )
 }

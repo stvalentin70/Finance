@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Трекер финансов</string>
+    <string name="main_screen">Главная</string>
+    <string name="statistics_screen">Статистика</string>
+    <string name="history_screen">История</string>
+    <string name="settings_screen">Настройки</string>
+    <string name="calendar_screen">Календарь</string>
+    
+    <!-- Добавьте другие строковые ресурсы, которые у вас уже есть -->
 </resources>
