@@ -6,6 +6,4 @@
     <string name="settings_screen">Настройки</string>
     <string name="calendar_screen">Календарь</string>
     <string name="savings_screen">Накопления</string>
-    
-    <!-- Добавьте другие строковые ресурсы, которые у вас уже есть -->
 </resources>

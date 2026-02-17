@@ -60,7 +60,7 @@ fun BottomNavigationBar(
         BottomNavItem.Calendar,
         BottomNavItem.History,
         BottomNavItem.Statistics,
-        BottomNavItem.Savings  // ← Вместо Settings
+        BottomNavItem.Savings
     )
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
