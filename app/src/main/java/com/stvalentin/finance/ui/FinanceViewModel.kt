@@ -20,6 +20,11 @@ enum class StatsPeriod {
     WEEK, MONTH, YEAR, ALL_TIME
 }
 
+// Режимы отображения статистики
+enum class StatsMode {
+    SINGLE, COMPARE
+}
+
 class FinanceViewModel(
     private val transactionDao: TransactionDao,
     private val regularPaymentDao: RegularPaymentDao,
@@ -84,37 +89,78 @@ class FinanceViewModel(
     
     // ========== ДАННЫЕ ДЛЯ СТАТИСТИКИ С ФИЛЬТРОМ ==========
     
-    // Текущий выбранный период
+    // Текущий режим
+    private val _statsMode = MutableStateFlow(StatsMode.SINGLE)
+    val statsMode: StateFlow<StatsMode> = _statsMode.asStateFlow()
+    
+    // Текущий выбранный период (для обычного режима)
     private val _selectedPeriod = MutableStateFlow(StatsPeriod.MONTH)
     val selectedPeriod: StateFlow<StatsPeriod> = _selectedPeriod.asStateFlow()
     
-    // Доход за выбранный период
+    // Даты для сравнения
+    private val _periodAStart = MutableStateFlow(getStartOfMonth())
+    private val _periodAEnd = MutableStateFlow(System.currentTimeMillis())
+    private val _periodBStart = MutableStateFlow(getStartOfPreviousMonth())
+    private val _periodBEnd = MutableStateFlow(getEndOfPreviousMonth())
+    
+    val periodAStart: StateFlow<Long> = _periodAStart.asStateFlow()
+    val periodAEnd: StateFlow<Long> = _periodAEnd.asStateFlow()
+    val periodBStart: StateFlow<Long> = _periodBStart.asStateFlow()
+    val periodBEnd: StateFlow<Long> = _periodBEnd.asStateFlow()
+    
+    // Данные для обычного режима
     private val _periodIncome = MutableStateFlow(0.0)
     val periodIncome: StateFlow<Double> = _periodIncome.asStateFlow()
     
-    // Расход за выбранный период
     private val _periodExpenses = MutableStateFlow(0.0)
     val periodExpenses: StateFlow<Double> = _periodExpenses.asStateFlow()
     
-    // Баланс за выбранный период
     private val _periodBalance = MutableStateFlow(0.0)
     val periodBalance: StateFlow<Double> = _periodBalance.asStateFlow()
     
-    // Расходы по категориям за период
     private val _periodExpenseStats = MutableStateFlow<List<CategoryStat>>(emptyList())
     val periodExpenseStats: StateFlow<List<CategoryStat>> = _periodExpenseStats.asStateFlow()
     
-    // Доходы по категориям за период
     private val _periodIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
     val periodIncomeStats: StateFlow<List<CategoryStat>> = _periodIncomeStats.asStateFlow()
     
-    // Средний расход в день за период
     private val _averageDailyExpensePeriod = MutableStateFlow(0.0)
     val averageDailyExpensePeriod: StateFlow<Double> = _averageDailyExpensePeriod.asStateFlow()
     
-    // Топ категория за период
     private val _topExpenseCategoryPeriod = MutableStateFlow<Pair<String, Double>?>(null)
     val topExpenseCategoryPeriod: StateFlow<Pair<String, Double>?> = _topExpenseCategoryPeriod.asStateFlow()
+    
+    // Данные для режима сравнения (Период А)
+    private val _periodAIncome = MutableStateFlow(0.0)
+    val periodAIncome: StateFlow<Double> = _periodAIncome.asStateFlow()
+    
+    private val _periodAExpenses = MutableStateFlow(0.0)
+    val periodAExpenses: StateFlow<Double> = _periodAExpenses.asStateFlow()
+    
+    private val _periodABalance = MutableStateFlow(0.0)
+    val periodABalance: StateFlow<Double> = _periodABalance.asStateFlow()
+    
+    private val _periodAExpenseStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodAExpenseStats: StateFlow<List<CategoryStat>> = _periodAExpenseStats.asStateFlow()
+    
+    private val _periodAIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodAIncomeStats: StateFlow<List<CategoryStat>> = _periodAIncomeStats.asStateFlow()
+    
+    // Данные для режима сравнения (Период Б)
+    private val _periodBIncome = MutableStateFlow(0.0)
+    val periodBIncome: StateFlow<Double> = _periodBIncome.asStateFlow()
+    
+    private val _periodBExpenses = MutableStateFlow(0.0)
+    val periodBExpenses: StateFlow<Double> = _periodBExpenses.asStateFlow()
+    
+    private val _periodBBalance = MutableStateFlow(0.0)
+    val periodBBalance: StateFlow<Double> = _periodBBalance.asStateFlow()
+    
+    private val _periodBExpenseStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodBExpenseStats: StateFlow<List<CategoryStat>> = _periodBExpenseStats.asStateFlow()
+    
+    private val _periodBIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
+    val periodBIncomeStats: StateFlow<List<CategoryStat>> = _periodBIncomeStats.asStateFlow()
     
     init {
         viewModelScope.launch {
@@ -130,11 +176,9 @@ class FinanceViewModel(
                 .collect { savings ->
                     _allSavings.value = savings
                     
-                    // Общая сумма всех накоплений
                     val total = savings.sumOf { it.amount }
                     _totalSavings.value = total
                     
-                    // Сумма по валютам
                     val byCurrency = savings
                         .groupBy { it.currency }
                         .mapValues { it.value.sumOf { it.amount } }
@@ -142,24 +186,41 @@ class FinanceViewModel(
                 }
         }
         
-        // Загружаем статистику при изменении периода
+        // Загружаем начальные данные
         viewModelScope.launch {
-            _selectedPeriod.collect { period ->
-                loadStatsForPeriod(period)
-            }
+            loadStats()
         }
         
-        // Запускаем Worker при создании ViewModel
+        // Запускаем Worker
         setupReminderWorker()
     }
     
-    // ========== МЕТОДЫ ДЛЯ СМЕНЫ ПЕРИОДА ==========
+    // ========== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ РЕЖИМАМИ ==========
+    
+    fun setStatsMode(mode: StatsMode) {
+        _statsMode.value = mode
+        loadStats()
+    }
     
     fun setStatsPeriod(period: StatsPeriod) {
         _selectedPeriod.value = period
+        updateDatesFromPeriod(period)
+        loadStats()
     }
     
-    private suspend fun loadStatsForPeriod(period: StatsPeriod) {
+    fun setPeriodADates(start: Long, end: Long) {
+        _periodAStart.value = start
+        _periodAEnd.value = end
+        loadStats()
+    }
+    
+    fun setPeriodBDates(start: Long, end: Long) {
+        _periodBStart.value = start
+        _periodBEnd.value = end
+        loadStats()
+    }
+    
+    private fun updateDatesFromPeriod(period: StatsPeriod) {
         val calendar = Calendar.getInstance()
         val endDate = calendar.timeInMillis
         
@@ -179,8 +240,37 @@ class FinanceViewModel(
             StatsPeriod.ALL_TIME -> 0L
         }
         
+        _periodAStart.value = startDate
+        _periodAEnd.value = endDate
+        
+        val prevCalendar = Calendar.getInstance()
+        prevCalendar.timeInMillis = startDate
+        when (period) {
+            StatsPeriod.WEEK -> prevCalendar.add(Calendar.DAY_OF_YEAR, -7)
+            StatsPeriod.MONTH -> prevCalendar.add(Calendar.MONTH, -1)
+            StatsPeriod.YEAR -> prevCalendar.add(Calendar.YEAR, -1)
+            StatsPeriod.ALL_TIME -> prevCalendar.timeInMillis = 0L
+        }
+        
+        _periodBStart.value = prevCalendar.timeInMillis
+        _periodBEnd.value = startDate - 1
+    }
+    
+    private fun loadStats() {
+        viewModelScope.launch {
+            if (_statsMode.value == StatsMode.SINGLE) {
+                loadSingleStats()
+            } else {
+                loadCompareStats()
+            }
+        }
+    }
+    
+    private suspend fun loadSingleStats() {
+        val startDate = _periodAStart.value
+        val endDate = _periodAEnd.value
+        
         try {
-            // Загружаем данные (теперь они гарантированно не null благодаря COALESCE)
             val income = transactionDao.getIncomeForPeriod(startDate, endDate)
             val expenses = transactionDao.getExpensesForPeriod(startDate, endDate)
             val balance = transactionDao.getBalanceForPeriod(startDate, endDate)
@@ -188,35 +278,84 @@ class FinanceViewModel(
             val incomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, startDate, endDate)
             val avgDailyExpense = transactionDao.getAverageDailyExpenseForPeriod(startDate, endDate)
             
-            // Обновляем StateFlow
             _periodIncome.value = income
             _periodExpenses.value = expenses
             _periodBalance.value = balance
             _periodExpenseStats.value = expenseStats
             _periodIncomeStats.value = incomeStats
             _averageDailyExpensePeriod.value = avgDailyExpense
-            
-            // Находим топ категорию
             _topExpenseCategoryPeriod.value = expenseStats.maxByOrNull { it.total }?.let {
                 it.category to it.total
             }
             
-            Log.d("FinanceViewModel", "Статистика загружена: доход=$income, расход=$expenses")
-            
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "Ошибка загрузки статистики", e)
-            // В случае ошибки устанавливаем пустые значения
-            _periodIncome.value = 0.0
-            _periodExpenses.value = 0.0
-            _periodBalance.value = 0.0
-            _periodExpenseStats.value = emptyList()
-            _periodIncomeStats.value = emptyList()
-            _averageDailyExpensePeriod.value = 0.0
-            _topExpenseCategoryPeriod.value = null
+            resetSingleStats()
         }
     }
     
-    // ========== СТАРЫЕ МЕТОДЫ ДЛЯ СОВМЕСТИМОСТИ ==========
+    private suspend fun loadCompareStats() {
+        val aStart = _periodAStart.value
+        val aEnd = _periodAEnd.value
+        val bStart = _periodBStart.value
+        val bEnd = _periodBEnd.value
+        
+        try {
+            val aIncome = transactionDao.getIncomeForPeriod(aStart, aEnd)
+            val aExpenses = transactionDao.getExpensesForPeriod(aStart, aEnd)
+            val aBalance = transactionDao.getBalanceForPeriod(aStart, aEnd)
+            val aExpenseStats = transactionDao.getCategoryStatsForPeriod(TransactionType.EXPENSE, aStart, aEnd)
+            val aIncomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, aStart, aEnd)
+            
+            _periodAIncome.value = aIncome
+            _periodAExpenses.value = aExpenses
+            _periodABalance.value = aBalance
+            _periodAExpenseStats.value = aExpenseStats
+            _periodAIncomeStats.value = aIncomeStats
+            
+            val bIncome = transactionDao.getIncomeForPeriod(bStart, bEnd)
+            val bExpenses = transactionDao.getExpensesForPeriod(bStart, bEnd)
+            val bBalance = transactionDao.getBalanceForPeriod(bStart, bEnd)
+            val bExpenseStats = transactionDao.getCategoryStatsForPeriod(TransactionType.EXPENSE, bStart, bEnd)
+            val bIncomeStats = transactionDao.getCategoryStatsForPeriod(TransactionType.INCOME, bStart, bEnd)
+            
+            _periodBIncome.value = bIncome
+            _periodBExpenses.value = bExpenses
+            _periodBBalance.value = bBalance
+            _periodBExpenseStats.value = bExpenseStats
+            _periodBIncomeStats.value = bIncomeStats
+            
+        } catch (e: Exception) {
+            Log.e("FinanceViewModel", "Ошибка загрузки статистики сравнения", e)
+            resetCompareStats()
+        }
+    }
+    
+    private fun resetSingleStats() {
+        _periodIncome.value = 0.0
+        _periodExpenses.value = 0.0
+        _periodBalance.value = 0.0
+        _periodExpenseStats.value = emptyList()
+        _periodIncomeStats.value = emptyList()
+        _averageDailyExpensePeriod.value = 0.0
+        _topExpenseCategoryPeriod.value = null
+    }
+    
+    private fun resetCompareStats() {
+        _periodAIncome.value = 0.0
+        _periodAExpenses.value = 0.0
+        _periodABalance.value = 0.0
+        _periodAExpenseStats.value = emptyList()
+        _periodAIncomeStats.value = emptyList()
+        
+        _periodBIncome.value = 0.0
+        _periodBExpenses.value = 0.0
+        _periodBBalance.value = 0.0
+        _periodBExpenseStats.value = emptyList()
+        _periodBIncomeStats.value = emptyList()
+    }
+    
+    // ========== СТАНДАРТНЫЕ МЕТОДЫ ==========
     
     fun getTransactionById(id: Long): Flow<Transaction?> {
         return transactionDao.getTransactionById(id)
@@ -239,8 +378,7 @@ class FinanceViewModel(
             )
             transactionDao.insert(transaction)
             updateWidget()
-            // Перезагружаем статистику после добавления
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
     
@@ -248,7 +386,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.update(transaction)
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
     
@@ -256,7 +394,7 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.delete(transaction)
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
     
@@ -264,11 +402,10 @@ class FinanceViewModel(
         viewModelScope.launch {
             transactionDao.deleteAll()
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
     
-    // Regular Payments
     fun getRegularPaymentById(id: Long): Flow<RegularPayment?> {
         return regularPaymentDao.getAllActivePayments()
             .map { payments -> payments.find { it.id == id } }
@@ -340,11 +477,9 @@ class FinanceViewModel(
             regularPaymentDao.update(updatedPayment)
             
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
-    
-    // ========== МЕТОДЫ ДЛЯ НАКОПЛЕНИЙ ==========
     
     fun getSavingById(id: Long): Flow<Saving?> {
         return allSavings.map { savings -> savings.find { it.id == id } }
@@ -387,7 +522,7 @@ class FinanceViewModel(
             transactionDao.insert(transaction)
             
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
+            loadStats()
         }
     }
     
@@ -414,13 +549,7 @@ class FinanceViewModel(
             transactionDao.insert(transaction)
             
             updateWidget()
-            loadStatsForPeriod(_selectedPeriod.value)
-        }
-    }
-    
-    fun archiveSaving(id: Long) {
-        viewModelScope.launch {
-            savingDao.archiveSaving(id)
+            loadStats()
         }
     }
     
@@ -444,7 +573,7 @@ class FinanceViewModel(
                 transactionDao.insert(transaction)
                 
                 updateWidget()
-                loadStatsForPeriod(_selectedPeriod.value)
+                loadStats()
             }
         }
     }
@@ -469,60 +598,12 @@ class FinanceViewModel(
                 transactionDao.insert(transaction)
                 
                 updateWidget()
-                loadStatsForPeriod(_selectedPeriod.value)
+                loadStats()
             }
         }
     }
     
-    fun transferToSaving(
-        fromSavingId: Long?,
-        toSavingId: Long,
-        amount: Double,
-        description: String = "Перевод между накоплениями"
-    ) {
-        viewModelScope.launch {
-            val toSaving = savingDao.getSavingById(toSavingId)
-            
-            if (fromSavingId == null) {
-                if (toSaving != null) {
-                    val updatedToSaving = toSaving.copy(
-                        amount = toSaving.amount + amount,
-                        dateUpdated = System.currentTimeMillis()
-                    )
-                    savingDao.update(updatedToSaving)
-                    
-                    val transaction = Transaction(
-                        type = TransactionType.SAVING,
-                        category = toSaving.category,
-                        amount = amount,
-                        description = description,
-                        date = System.currentTimeMillis()
-                    )
-                    transactionDao.insert(transaction)
-                    
-                    updateWidget()
-                    loadStatsForPeriod(_selectedPeriod.value)
-                }
-            } else {
-                val fromSaving = savingDao.getSavingById(fromSavingId)
-                if (fromSaving != null && toSaving != null && fromSaving.amount >= amount) {
-                    val updatedFromSaving = fromSaving.copy(
-                        amount = fromSaving.amount - amount,
-                        dateUpdated = System.currentTimeMillis()
-                    )
-                    val updatedToSaving = toSaving.copy(
-                        amount = toSaving.amount + amount,
-                        dateUpdated = System.currentTimeMillis()
-                    )
-                    
-                    savingDao.update(updatedFromSaving)
-                    savingDao.update(updatedToSaving)
-                }
-            }
-        }
-    }
-    
-    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ (ОСТАВЛЯЕМ) ==========
+    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ ==========
     
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(
@@ -788,5 +869,39 @@ class FinanceViewModel(
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         return calendar.timeInMillis
+    }
+    
+    companion object {
+        private fun getStartOfMonth(): Long {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.DAY_OF_MONTH, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            return calendar.timeInMillis
+        }
+        
+        private fun getStartOfPreviousMonth(): Long {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.DAY_OF_MONTH, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            calendar.add(Calendar.MONTH, -1)
+            return calendar.timeInMillis
+        }
+        
+        private fun getEndOfPreviousMonth(): Long {
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.DAY_OF_MONTH, 1)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            calendar.add(Calendar.DAY_OF_MONTH, -1)
+            return calendar.timeInMillis
+        }
     }
 }

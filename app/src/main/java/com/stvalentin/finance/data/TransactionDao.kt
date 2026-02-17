@@ -41,7 +41,6 @@ interface TransactionDao {
     """)
     fun getBalance(): Flow<Double>
     
-    // НОВЫЕ МЕТОДЫ С ФИЛЬТРАЦИЕЙ ПО ДАТАМ (с COALESCE)
     @Query("""
         SELECT COALESCE(SUM(amount), 0) 
         FROM transactions 
@@ -85,7 +84,6 @@ interface TransactionDao {
     """)
     suspend fun getAverageDailyExpenseForPeriod(startDate: Long, endDate: Long): Double
     
-    // ОСТАВЛЯЕМ СТАРЫЕ МЕТОДЫ ДЛЯ СОВМЕСТИМОСТИ
     @Query("""
         SELECT category, SUM(amount) as total 
         FROM transactions 
