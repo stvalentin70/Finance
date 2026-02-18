@@ -34,12 +34,12 @@ fun PaymentCalendarScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var paymentToDelete by remember { mutableStateOf<RegularPayment?>(null) }
     
-    // Группируем платежи по дням месяца
+    // Группируем платежи по дням месяца и сортируем по убыванию дней
     val paymentsByDay = remember(payments) {
         payments
             .filter { it.isActive }
             .groupBy { it.dayOfMonth }
-            .toSortedMap()
+            .toSortedMap(compareByDescending { it })
     }
     
     // Текущий месяц и год
@@ -48,7 +48,7 @@ fun PaymentCalendarScreen(
     val currentYear = remember { calendar.get(Calendar.YEAR) }
     val monthNames = arrayOf(
         "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+        "Июль", "Август", "Сентябрь", "Окторябрь", "Ноябрь", "Декабрь"
     )
     
     Scaffold(

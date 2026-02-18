@@ -579,7 +579,7 @@ fun HistoryScreen(
                 }
             }
             
-            // 4. ЗАГОЛОВОК СПИСКА
+            // 4. ЗАГОЛОВОК СПИСКА (исправлено)
             if (filteredTransactions.isNotEmpty()) {
                 item {
                     Row(
@@ -591,8 +591,8 @@ fun HistoryScreen(
                     ) {
                         Text(
                             text = "ОПЕРАЦИИ",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.titleSmall.copy(  // Исправлено
+                                fontWeight = FontWeight.Bold
                             )
                         )
                         Text(

@@ -1,7 +1,11 @@
 package com.stvalentin.finance.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
-import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,14 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.stvalentin.finance.data.Transaction
 import com.stvalentin.finance.data.TransactionType
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileWriter
+import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,8 +38,6 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     
     var showDeleteAllDialog by remember { mutableStateOf(false) }
-    var showExportDialog by remember { mutableStateOf(false) }
-    var showImportDialog by remember { mutableStateOf(false) }
     var showMessage by remember { mutableStateOf(false) }
     var messageText by remember { mutableStateOf("") }
     var messageType by remember { mutableStateOf(MessageType.SUCCESS) }
@@ -52,6 +52,73 @@ fun SettingsScreen(
         }
     }
     val versionName = packageInfo?.versionName ?: "1.0.0"
+    
+    // Launcher для создания файла (экспорт)
+    val createFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val success = exportTransactionsToCsv(context, transactions, uri)
+                messageText = if (success) {
+                    "Данные успешно экспортированы"
+                } else {
+                    "Ошибка при экспорте данных"
+                }
+                messageType = if (success) MessageType.SUCCESS else MessageType.ERROR
+                showMessage = true
+            }
+        }
+    }
+    
+    // Launcher для выбора файла (импорт) - ИСПРАВЛЕНО с OpenDocument
+    val selectFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                // Сохраняем права на чтение URI
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                
+                // Импортируем
+                val success = importTransactionsFromCsv(context, viewModel, uri)
+                
+                messageText = if (success) {
+                    "Данные успешно импортированы"
+                } else {
+                    "Файл имеет неверный формат или не содержит данных"
+                }
+                messageType = if (success) MessageType.SUCCESS else MessageType.ERROR
+                showMessage = true
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+                messageText = "Нет прав доступа к файлу"
+                messageType = MessageType.ERROR
+                showMessage = true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                messageText = "Ошибка импорта: ${e.message}"
+                messageType = MessageType.ERROR
+                showMessage = true
+            }
+        }
+    }
+    
+    // Launcher для разрешений (Android 10 и ниже)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            selectFileLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
+        } else {
+            messageText = "Необходимо разрешение на чтение файлов"
+            messageType = MessageType.ERROR
+            showMessage = true
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -86,7 +153,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (НОВЫЙ РАЗДЕЛ)
+            // ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -160,7 +227,7 @@ fun SettingsScreen(
                 }
             }
             
-            // АНАЛИЗ ДОХОДОВ (НОВЫЙ РАЗДЕЛ)
+            // АНАЛИЗ ДОХОДОВ
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -269,7 +336,8 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clickable { 
                                     if (transactions.isNotEmpty()) {
-                                        showExportDialog = true 
+                                        val defaultFileName = "Finance_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale("ru")).format(Date())}.csv"
+                                        createFileLauncher.launch(defaultFileName)
                                     } else {
                                         messageText = "Нет данных для экспорта"
                                         messageType = MessageType.ERROR
@@ -298,7 +366,7 @@ fun SettingsScreen(
                                         )
                                     )
                                     Text(
-                                        text = "Сохранить все транзакции в CSV",
+                                        text = "Сохранить транзакции в CSV файл",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
@@ -315,7 +383,15 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showImportDialog = true }
+                                .clickable { 
+                                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+                                        // Android 10 и ниже - запрашиваем разрешение
+                                        permissionLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                                    } else {
+                                        // Android 11+ - открываем документ-пикер
+                                        selectFileLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
+                                    }
+                                }
                                 .padding(vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -532,95 +608,6 @@ fun SettingsScreen(
         }
     }
     
-    // Диалог экспорта
-    if (showExportDialog) {
-        AlertDialog(
-            onDismissRequest = { showExportDialog = false },
-            title = { Text("Экспорт данных") },
-            text = { 
-                Column {
-                    Text("Будет экспортировано ${transactions.size} транзакций в файл:")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Finance_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale("ru")).format(Date())}.csv",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Файл будет сохранён в папку Downloads/Finance/")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            val success = exportTransactionsToCsv(context, transactions)
-                            showExportDialog = false
-                            messageText = if (success) {
-                                "Данные успешно экспортированы"
-                            } else {
-                                "Ошибка при экспорте данных"
-                            }
-                            messageType = if (success) MessageType.SUCCESS else MessageType.ERROR
-                            showMessage = true
-                        }
-                    }
-                ) {
-                    Text("Экспортировать")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExportDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        )
-    }
-    
-    // Диалог импорта
-    if (showImportDialog) {
-        AlertDialog(
-            onDismissRequest = { showImportDialog = false },
-            title = { Text("Импорт данных") },
-            text = { 
-                Column {
-                    Text("Внимание! Импорт данных:")
-                    Text("• Загрузит транзакции из CSV файла")
-                    Text("• Добавит их к существующим")
-                    Text("• Не удаляет текущие данные")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Поместите CSV файл в папку Downloads/Finance/")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            val success = importTransactionsFromCsv(context, viewModel)
-                            showImportDialog = false
-                            messageText = if (success) {
-                                "Данные успешно импортированы"
-                            } else {
-                                "Файл не найден или имеет неверный формат"
-                            }
-                            messageType = if (success) MessageType.SUCCESS else MessageType.ERROR
-                            showMessage = true
-                        }
-                    }
-                ) {
-                    Text("Импортировать")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showImportDialog = false }) {
-                    Text("Отмена")
-                }
-            }
-        )
-    }
-    
     // Диалог подтверждения удаления всех транзакций
     if (showDeleteAllDialog) {
         AlertDialog(
@@ -686,36 +673,25 @@ enum class MessageType {
     SUCCESS, ERROR
 }
 
-// Функции экспорта/импорта
-fun exportTransactionsToCsv(context: android.content.Context, transactions: List<Transaction>): Boolean {
+// Функции экспорта/импорта с URI
+fun exportTransactionsToCsv(context: Context, transactions: List<Transaction>, uri: Uri): Boolean {
     return try {
         val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
         
-        // Создаём папку Finance в Downloads
-        val downloadsDir = File(
-            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
-            "Finance"
-        )
-        if (!downloadsDir.exists()) {
-            downloadsDir.mkdirs()
-        }
-        
-        // Имя файла с датой
-        val fileName = "Finance_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale("ru")).format(Date())}.csv"
-        val file = File(downloadsDir, fileName)
-        
-        FileWriter(file).use { writer ->
-            // Заголовки CSV
-            writer.append("ID,Тип,Категория,Сумма,Описание,Дата\n")
-            
-            // Данные
-            transactions.forEach { t ->
-                writer.append("${t.id},")
-                writer.append("${if (t.type == TransactionType.INCOME) "Доход" else "Расход"},")
-                writer.append("${t.category},")
-                writer.append("${t.amount},")
-                writer.append("\"${t.description}\",")
-                writer.append("${dateFormat.format(Date(t.date))}\n")
+        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+            OutputStreamWriter(outputStream).use { writer ->
+                // Заголовки CSV
+                writer.append("ID,Тип,Категория,Сумма,Описание,Дата\n")
+                
+                // Данные
+                transactions.forEach { t ->
+                    writer.append("${t.id},")
+                    writer.append("${if (t.type == TransactionType.INCOME) "Доход" else "Расход"},")
+                    writer.append("${t.category},")
+                    writer.append("${t.amount},")
+                    writer.append("\"${t.description.replace("\"", "\"\"")}\",")
+                    writer.append("${dateFormat.format(Date(t.date))}\n")
+                }
             }
         }
         true
@@ -725,45 +701,78 @@ fun exportTransactionsToCsv(context: android.content.Context, transactions: List
     }
 }
 
-fun importTransactionsFromCsv(context: android.content.Context, viewModel: FinanceViewModel): Boolean {
+fun importTransactionsFromCsv(context: Context, viewModel: FinanceViewModel, uri: Uri): Boolean {
     return try {
-        val downloadsDir = File(
-            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
-            "Finance"
-        )
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
+        var importedCount = 0
         
-        // Ищем последний CSV файл
-        val csvFiles = downloadsDir.listFiles { _, name -> name.endsWith(".csv") }
-        if (csvFiles.isNullOrEmpty()) return false
-        
-        val latestFile = csvFiles.maxByOrNull { it.lastModified() } ?: return false
-        
-        latestFile.readLines().forEachIndexed { index, line ->
-            if (index == 0) return@forEachIndexed // Пропускаем заголовок
-            
-            val parts = line.split(",")
-            if (parts.size >= 6) {
-                val type = if (parts[1] == "Доход") TransactionType.INCOME else TransactionType.EXPENSE
-                val category = parts[2]
-                val amount = parts[3].toDoubleOrNull() ?: return@forEachIndexed
-                val description = parts[4].replace("\"", "")
-                val dateString = parts[5]
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                var line: String?
+                var isFirstLine = true
                 
-                val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
-                val date = dateFormat.parse(dateString)?.time ?: System.currentTimeMillis()
-                
-                viewModel.addTransaction(
-                    type = type,
-                    category = category,
-                    amount = amount,
-                    description = description,
-                    date = date
-                )
+                while (reader.readLine().also { line = it } != null) {
+                    if (isFirstLine) {
+                        isFirstLine = false
+                        continue
+                    }
+                    
+                    val currentLine = line
+                    if (currentLine.isNullOrBlank()) continue
+                    
+                    val parts = parseCsvLine(currentLine)
+                    if (parts.size >= 6) {
+                        val type = if (parts[1] == "Доход") TransactionType.INCOME else TransactionType.EXPENSE
+                        val category = parts[2]
+                        val amount = parts[3].toDoubleOrNull() ?: continue
+                        val description = parts[4]
+                        val dateString = parts[5]
+                        
+                        val date = try {
+                            dateFormat.parse(dateString)?.time ?: System.currentTimeMillis()
+                        } catch (e: Exception) {
+                            System.currentTimeMillis()
+                        }
+                        
+                        viewModel.addTransaction(
+                            type = type,
+                            category = category,
+                            amount = amount,
+                            description = description,
+                            date = date
+                        )
+                        importedCount++
+                    }
+                }
             }
         }
-        true
+        importedCount > 0
     } catch (e: Exception) {
         e.printStackTrace()
         false
     }
+}
+
+// Вспомогательная функция для парсинга CSV строки с учетом кавычек
+fun parseCsvLine(line: String): List<String> {
+    val result = mutableListOf<String>()
+    val current = StringBuilder()
+    var inQuotes = false
+    
+    for (char in line) {
+        when {
+            char == '"' -> {
+                inQuotes = !inQuotes
+            }
+            char == ',' && !inQuotes -> {
+                result.add(current.toString())
+                current.clear()
+            }
+            else -> {
+                current.append(char)
+            }
+        }
+    }
+    result.add(current.toString())
+    return result
 }

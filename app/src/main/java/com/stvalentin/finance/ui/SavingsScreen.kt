@@ -95,7 +95,9 @@ fun SavingsScreen(
                 ) {
                     Text(
                         text = "ОБЩАЯ СУММА",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.titleSmall.copy(  // Исправлено
+                            fontWeight = FontWeight.Bold
+                        ),
                         color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
                     )
                     

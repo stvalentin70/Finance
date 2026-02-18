@@ -50,7 +50,7 @@ dependencies {
     // Базовые зависимости
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.1")
+    implementation("androidx.activity:activity-compose:1.9.0") // Обновлено до 1.9.0
     
     // AppCompat для виджета (XML активности)
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -84,8 +84,11 @@ dependencies {
     // GraphView для графиков (оставим на будущее)
     implementation("com.jjoe64:graphview:4.2.2")
     
-    // WORK MANAGER - ДОБАВЛЕНО!
+    // WORK MANAGER
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+    
+    // ДОБАВЛЕНО: Accompanist для permissions (если понадобятся для Android 13+)
+    implementation("com.google.accompanist:accompanist-permissions:0.35.0-alpha")
     
     // Тестирование
     testImplementation("junit:junit:4.13.2")

@@ -128,7 +128,9 @@ fun MainScreen(
                     ) {
                         Text(
                             text = "ФИНАНСОВЫЙ ОБЗОР",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleSmall.copy(  // Исправлено
+                                fontWeight = FontWeight.Bold
+                            ),
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -297,7 +299,9 @@ fun UpcomingPaymentsSection(
             ) {
                 Text(
                     text = "📅 БЛИЖАЙШИЕ ПЛАТЕЖИ",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall.copy(  // Исправлено
+                        fontWeight = FontWeight.Bold
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
