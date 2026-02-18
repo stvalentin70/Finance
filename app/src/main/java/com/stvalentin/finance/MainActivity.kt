@@ -136,12 +136,13 @@ fun FinanceApp() {
             val context = LocalContext.current
             val database = AppDatabase.getDatabase(context)
             
-            // Создаем ViewModel с тремя DAO и context
+            // Создаем ViewModel с четырьмя DAO и context
             val viewModel: FinanceViewModel = viewModel(
                 factory = FinanceViewModelFactory(
                     database.transactionDao(),
                     database.regularPaymentDao(),
                     database.savingDao(),
+                    database.userProfileDao(),  // ← Добавлено
                     context
                 )
             )
@@ -154,7 +155,8 @@ fun FinanceApp() {
                 bottomBar = {
                     if (currentRoute != "add_transaction/{transactionId}" &&
                         currentRoute != "add_regular_payment/{paymentId}" &&
-                        currentRoute != "add_saving/{savingId}") {
+                        currentRoute != "add_saving/{savingId}" &&
+                        currentRoute != "user_profile") {  // ← Добавлено
                         BottomNavigationBar(navController = navController)
                     }
                 }
@@ -227,7 +229,6 @@ fun FinanceApp() {
                             )
                         }
                         
-                        // НОВЫЕ МАРШРУТЫ ДЛЯ КОПИЛКИ
                         composable("savings") {
                             SavingsScreen(
                                 navController = navController,
@@ -240,6 +241,14 @@ fun FinanceApp() {
                             AddEditSavingScreen(
                                 navController = navController,
                                 savingId = savingId,
+                                viewModel = viewModel
+                            )
+                        }
+                        
+                        // НОВЫЙ МАРШРУТ ДЛЯ ПРОФИЛЯ
+                        composable("user_profile") {
+                            UserProfileScreen(
+                                navController = navController,
                                 viewModel = viewModel
                             )
                         }

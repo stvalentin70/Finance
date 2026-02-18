@@ -29,6 +29,7 @@ class FinanceViewModel(
     private val transactionDao: TransactionDao,
     private val regularPaymentDao: RegularPaymentDao,
     private val savingDao: SavingDao,
+    private val userProfileDao: UserProfileDao,
     private val context: Context
 ) : ViewModel() {
     
@@ -87,21 +88,20 @@ class FinanceViewModel(
         initialValue = 0.0
     )
     
-    // ========== ДАННЫЕ ДЛЯ СТАТИСТИКИ С ФИЛЬТРОМ ==========
+    // ========== ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ ==========
+    private val _userProfile = MutableStateFlow<UserProfile?>(null)
+    val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
     
-    // Текущий режим
+    // ========== ДАННЫЕ ДЛЯ СТАТИСТИКИ ==========
     private val _statsMode = MutableStateFlow(StatsMode.SINGLE)
     val statsMode: StateFlow<StatsMode> = _statsMode.asStateFlow()
     
-    // Текущий выбранный период (для обычного режима)
     private val _selectedPeriod = MutableStateFlow(StatsPeriod.MONTH)
     val selectedPeriod: StateFlow<StatsPeriod> = _selectedPeriod.asStateFlow()
     
-    // Даты для обычного режима
     private val _singleStart = MutableStateFlow(getStartOfMonth())
     private val _singleEnd = MutableStateFlow(System.currentTimeMillis())
     
-    // Даты для сравнения
     private val _periodAStart = MutableStateFlow(getStartOfPreviousMonth())
     private val _periodAEnd = MutableStateFlow(getEndOfPreviousMonth())
     private val _periodBStart = MutableStateFlow(getStartOfMonth())
@@ -136,7 +136,7 @@ class FinanceViewModel(
     private val _topExpenseCategoryPeriod = MutableStateFlow<Pair<String, Double>?>(null)
     val topExpenseCategoryPeriod: StateFlow<Pair<String, Double>?> = _topExpenseCategoryPeriod.asStateFlow()
     
-    // Данные для режима сравнения (Период А)
+    // Данные для режима сравнения
     private val _periodAIncome = MutableStateFlow(0.0)
     val periodAIncome: StateFlow<Double> = _periodAIncome.asStateFlow()
     
@@ -152,7 +152,6 @@ class FinanceViewModel(
     private val _periodAIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
     val periodAIncomeStats: StateFlow<List<CategoryStat>> = _periodAIncomeStats.asStateFlow()
     
-    // Данные для режима сравнения (Период Б)
     private val _periodBIncome = MutableStateFlow(0.0)
     val periodBIncome: StateFlow<Double> = _periodBIncome.asStateFlow()
     
@@ -168,6 +167,54 @@ class FinanceViewModel(
     private val _periodBIncomeStats = MutableStateFlow<List<CategoryStat>>(emptyList())
     val periodBIncomeStats: StateFlow<List<CategoryStat>> = _periodBIncomeStats.asStateFlow()
     
+    // График
+    val balanceHistory = allTransactions.combine(allTransactions) { transactions, _ ->
+        calculateDailyBalance(transactions)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+    
+    val averageDailyExpense = allTransactions.combine(allTransactions) { transactions, _ ->
+        calculateAverageDailyExpense(transactions)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
+    
+    val topExpenseCategory = allTransactions.combine(allTransactions) { transactions, _ ->
+        findTopExpenseCategory(transactions)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+    
+    val expenseComparison = allTransactions.combine(allTransactions) { transactions, _ ->
+        compareWithPreviousMonth(transactions)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
+    
+    // Совет дня (обновленный с учетом профиля)
+    val adviceMessage = combine(
+        topExpenseCategory,
+        expenseComparison,
+        totalSavings,
+        availableBalance,
+        userProfile
+    ) { topCategory, comparison, savings, available, profile ->
+        generateAdvice(topCategory, comparison, savings, available, profile)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = "Добавьте транзакции и заполните профиль для персональных рекомендаций"
+    )
+    
     init {
         viewModelScope.launch {
             regularPaymentDao.getAllActivePayments()
@@ -176,12 +223,10 @@ class FinanceViewModel(
                 }
         }
         
-        // Загружаем накопления
         viewModelScope.launch {
             savingDao.getAllSavings()
                 .collect { savings ->
                     _allSavings.value = savings
-                    
                     val total = savings.sumOf { it.amount }
                     _totalSavings.value = total
                     
@@ -192,20 +237,44 @@ class FinanceViewModel(
                 }
         }
         
-        // Загружаем начальные данные
+        // Загружаем профиль
+        viewModelScope.launch {
+            userProfileDao.getUserProfile()
+                .collect { profile ->
+                    _userProfile.value = profile
+                }
+        }
+        
+        // Создаем профиль по умолчанию, если его нет
+        viewModelScope.launch {
+            val existing = userProfileDao.getUserProfileSync()
+            if (existing == null) {
+                val defaultProfile = UserProfile()
+                userProfileDao.insert(defaultProfile)
+                _userProfile.value = defaultProfile
+            }
+        }
+        
         viewModelScope.launch {
             loadStats()
         }
         
-        // Запускаем Worker
         setupReminderWorker()
+    }
+    
+    // ========== МЕТОДЫ ДЛЯ ПРОФИЛЯ ==========
+    
+    fun updateUserProfile(profile: UserProfile) {
+        viewModelScope.launch {
+            userProfileDao.update(profile)
+            // Профиль обновится через Flow автоматически
+        }
     }
     
     // ========== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ РЕЖИМАМИ ==========
     
     fun setStatsMode(mode: StatsMode) {
         _statsMode.value = mode
-        // Сбрасываем даты на значения по умолчанию при переключении режима
         if (mode == StatsMode.SINGLE) {
             resetSingleDates()
         } else {
@@ -238,13 +307,11 @@ class FinanceViewModel(
         loadStats()
     }
     
-    // Сброс дат для обычного режима
     private fun resetSingleDates() {
         _singleStart.value = getStartOfMonth()
         _singleEnd.value = System.currentTimeMillis()
     }
     
-    // Сброс дат для режима сравнения
     private fun resetCompareDates() {
         _periodAStart.value = getStartOfPreviousMonth()
         _periodAEnd.value = getEndOfPreviousMonth()
@@ -308,8 +375,6 @@ class FinanceViewModel(
                 it.category to it.total
             }
             
-            Log.d("FinanceViewModel", "Обычный режим: доход=$income, расход=$expenses")
-            
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "Ошибка загрузки статистики", e)
             resetSingleStats()
@@ -323,7 +388,6 @@ class FinanceViewModel(
         val bEnd = _periodBEnd.value
         
         try {
-            // Период А
             val aIncome = transactionDao.getIncomeForPeriod(aStart, aEnd)
             val aExpenses = transactionDao.getExpensesForPeriod(aStart, aEnd)
             val aBalance = transactionDao.getBalanceForPeriod(aStart, aEnd)
@@ -336,7 +400,6 @@ class FinanceViewModel(
             _periodAExpenseStats.value = aExpenseStats
             _periodAIncomeStats.value = aIncomeStats
             
-            // Период Б
             val bIncome = transactionDao.getIncomeForPeriod(bStart, bEnd)
             val bExpenses = transactionDao.getExpensesForPeriod(bStart, bEnd)
             val bBalance = transactionDao.getBalanceForPeriod(bStart, bEnd)
@@ -348,8 +411,6 @@ class FinanceViewModel(
             _periodBBalance.value = bBalance
             _periodBExpenseStats.value = bExpenseStats
             _periodBIncomeStats.value = bIncomeStats
-            
-            Log.d("FinanceViewModel", "Режим сравнения: A доход=$aIncome, B доход=$bIncome")
             
         } catch (e: Exception) {
             Log.e("FinanceViewModel", "Ошибка загрузки статистики сравнения", e)
@@ -379,6 +440,124 @@ class FinanceViewModel(
         _periodBBalance.value = 0.0
         _periodBExpenseStats.value = emptyList()
         _periodBIncomeStats.value = emptyList()
+    }
+    
+    // ========== ОБНОВЛЕННЫЙ СОВЕТНИК (с учетом профиля) ==========
+    
+    private fun generateAdvice(
+        topCategory: Pair<String, Double>?,
+        comparison: Double,
+        totalSavings: Double,
+        availableBalance: Double,
+        profile: UserProfile?
+    ): String {
+        // Если профиль не заполнен
+        if (profile == null) {
+            return "👤 Заполните профиль в настройках для персональных советов"
+        }
+        
+        val activeStatuses = profile.getActiveStatuses()
+        val statusEmojis = profile.getActiveStatusEmojis()
+        
+        // 1. КРАСНЫЙ УРОВЕНЬ - критично
+        if (periodExpenses.value > periodIncome.value && periodIncome.value > 0) {
+            val deficit = periodExpenses.value - periodIncome.value
+            return "⚠️ КРИТИЧНО: Расходы превышают доходы на ${"%.0f".format(deficit)} ₽! Срочно сократите траты"
+        }
+        
+        // 2. ОРАНЖЕВЫЙ УРОВЕНЬ - важно
+        val monthlyObligations = profile.housingPayment + profile.carPayment + profile.totalLoanPayment
+        if (monthlyObligations > 0 && availableBalance < monthlyObligations * 1.5) {
+            return "⚠️ Свободных средств (${"%.0f".format(availableBalance)} ₽) едва хватает на обязательные платежи (${"%.0f".format(monthlyObligations)} ₽). Будьте осторожны"
+        }
+        
+        // 3. ЖЕЛТЫЙ УРОВЕНЬ - рекомендации по статусам
+        val adviceList = mutableListOf<String>()
+        
+        // Советы для пенсионеров
+        if (profile.isRetiree) {
+            val daysToPension = getDaysToNextIncome(profile)
+            if (daysToPension in 1..10) {
+                adviceList.add("👴 До пенсии $daysToPension дней. Остаток: ${"%.0f".format(availableBalance)} ₽")
+            }
+        }
+        
+        // Советы для студентов
+        if (profile.isStudent) {
+            topCategory?.let { (cat, amount) ->
+                if (cat == "Кафе" || cat == "Рестораны") {
+                    adviceList.add("🎓 На кафе уходит ${"%.0f".format(amount)} ₽. Готовка дома сэкономит ${"%.0f".format(amount * 0.4)} ₽")
+                }
+            }
+            if (totalSavings < 10000) {
+                adviceList.add("🎓 Начните копить! Даже 1000 ₽ в месяц = 12 000 ₽ в год")
+            }
+        }
+        
+        // Советы для работников
+        if (profile.isWorker) {
+            topCategory?.let { (cat, amount) ->
+                if (cat == "Доставка еды") {
+                    adviceList.add("💼 На доставку уходит ${"%.0f".format(amount)} ₽. Самовывоз сэкономит 20%")
+                }
+            }
+        }
+        
+        // Советы для предпринимателей
+        if (profile.isEntrepreneur) {
+            if (comparison > 20) {
+                adviceList.add("📈 Расходы бизнеса выросли на ${"%.0f".format(comparison)}%. Проверьте обоснованность трат")
+            }
+        }
+        
+        // Советы для инвесторов
+        if (profile.isInvestor && totalSavings > 100000) {
+            adviceList.add("📈 С инвестициями ${"%.0f".format(totalSavings)} ₽. Рассмотрите диверсификацию")
+        }
+        
+        // Советы по ипотеке
+        if (profile.hasMortgage) {
+            adviceList.add("🏠 Платеж по ипотеке ${"%.0f".format(profile.housingPayment)} ₽. Не забывайте про досрочное погашение")
+        }
+        
+        // Советы по автокредиту
+        if (profile.hasCarLoan) {
+            adviceList.add("🚗 Кредит за авто ${"%.0f".format(profile.carPayment)} ₽/мес")
+        }
+        
+        // Советы по детям
+        if (profile.hasChildren) {
+            adviceList.add("👶 На детей (${profile.dependents}) запланируйте бюджет на образование и развитие")
+        }
+        
+        // 4. Если есть конкретные советы по статусам - показываем их
+        if (adviceList.isNotEmpty()) {
+            return "$statusEmojis ${adviceList.first()}"
+        }
+        
+        // 5. ЗЕЛЕНЫЙ УРОВЕНЬ - мотивация
+        if (totalSavings > 100000) {
+            return "🏆 Отличные накопления! ${"%.0f".format(totalSavings)} ₽. Пора изучать инвестиции"
+        }
+        
+        if (comparison < -10) {
+            return "📉 Отлично! Расходы снизились на ${"%.0f".format(-comparison)}% по сравнению с прошлым месяцем"
+        }
+        
+        // 6. СИНИЙ УРОВЕНЬ - информация
+        return "💡 Свободно ${"%.0f".format(availableBalance)} ₽. Рекомендуем отложить 10% (${"%.0f".format(availableBalance * 0.1)} ₽) в копилку"
+    }
+    
+    private fun getDaysToNextIncome(profile: UserProfile): Int {
+        val calendar = Calendar.getInstance()
+        val today = calendar.get(Calendar.DAY_OF_MONTH)
+        val incomeDay = profile.mainIncomeDay
+        
+        return if (incomeDay >= today) {
+            incomeDay - today
+        } else {
+            (incomeDay + calendar.getActualMaximum(Calendar.DAY_OF_MONTH)) - today
+        }
     }
     
     // ========== СТАНДАРТНЫЕ МЕТОДЫ ==========
@@ -432,7 +611,6 @@ class FinanceViewModel(
         }
     }
     
-    // Regular Payments
     fun getRegularPaymentById(id: Long): Flow<RegularPayment?> {
         return regularPaymentDao.getAllActivePayments()
             .map { payments -> payments.find { it.id == id } }
@@ -508,8 +686,6 @@ class FinanceViewModel(
         }
     }
     
-    // ========== МЕТОДЫ ДЛЯ НАКОПЛЕНИЙ ==========
-    
     fun getSavingById(id: Long): Flow<Saving?> {
         return allSavings.map { savings -> savings.find { it.id == id } }
             .stateIn(
@@ -579,6 +755,12 @@ class FinanceViewModel(
             
             updateWidget()
             loadStats()
+        }
+    }
+    
+    fun archiveSaving(id: Long) {
+        viewModelScope.launch {
+            savingDao.archiveSaving(id)
         }
     }
     
@@ -680,8 +862,6 @@ class FinanceViewModel(
         }
     }
     
-    // ========== МЕТОДЫ ДЛЯ СТАТИСТИКИ ==========
-    
     fun getIncomeStats() = transactionDao.getCategoryStats(TransactionType.INCOME)
         .stateIn(
             scope = viewModelScope,
@@ -707,85 +887,6 @@ class FinanceViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
-    
-    // ========== МЕТОДЫ ДЛЯ РАСЧЕТОВ И СОВЕТОВ ==========
-    
-    val balanceHistory = allTransactions.combine(allTransactions) { transactions, _ ->
-        calculateDailyBalance(transactions)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
-    
-    val averageDailyExpense = allTransactions.combine(allTransactions) { transactions, _ ->
-        calculateAverageDailyExpense(transactions)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0.0
-    )
-    
-    val topExpenseCategory = allTransactions.combine(allTransactions) { transactions, _ ->
-        findTopExpenseCategory(transactions)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = null
-    )
-    
-    val expenseComparison = allTransactions.combine(allTransactions) { transactions, _ ->
-        compareWithPreviousMonth(transactions)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0.0
-    )
-    
-    val adviceMessage = combine(
-        topExpenseCategory,
-        expenseComparison,
-        totalSavings,
-        availableBalance
-    ) { topCategory, comparison, savings, available ->
-        generateAdvice(topCategory, comparison, savings, available)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = "Добавьте транзакции, чтобы получить рекомендации"
-    )
-    
-    private fun generateAdvice(
-        topCategory: Pair<String, Double>?,
-        comparison: Double,
-        totalSavings: Double,
-        availableBalance: Double
-    ): String {
-        return when {
-            topCategory == null && totalSavings == 0.0 -> 
-                "Добавьте транзакции и накопления для персональных рекомендаций"
-            
-            totalSavings == 0.0 -> {
-                "💰 Начните копить! У вас свободно ${"%.0f".format(availableBalance)} ₽. " +
-                "Отложите хотя бы 10% от этой суммы."
-            }
-            
-            totalSavings < 50000 -> {
-                "🏦 У вас ${"%.0f".format(totalSavings)} ₽ в накоплениях. " +
-                "До подушки безопасности (50 000 ₽) осталось ${"%.0f".format(50000 - totalSavings)} ₽"
-            }
-            
-            totalSavings < 100000 -> {
-                "💰 Хорошая подушка! У вас ${"%.0f".format(totalSavings)} ₽. " +
-                "Можно рассмотреть открытие вклада."
-            }
-            
-            else -> {
-                "📈 Отличные накопления! ${"%.0f".format(totalSavings)} ₽. " +
-                "Пора изучать инвестиционные инструменты."
-            }
-        }
-    }
     
     private fun calculateDailyBalance(transactions: List<Transaction>): List<Pair<Long, Double>> {
         if (transactions.isEmpty()) return emptyList()
