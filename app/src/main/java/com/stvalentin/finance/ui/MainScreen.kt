@@ -23,11 +23,6 @@ import com.stvalentin.finance.data.UserProfile
 import java.text.NumberFormat
 import java.util.*
 
-// ⚠️ УБЕДИТЕСЬ, ЧТО ЭТИ ЦВЕТА НЕ ОПРЕДЕЛЕНЫ В ДРУГОМ ФАЙЛЕ
-// Если они уже есть в другом месте, удалите эти строки
-// val IncomeGreen = Color(0xFF4CAF50)
-// val ExpenseRed = Color(0xFFF44336)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -62,23 +57,6 @@ fun MainScreen(
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Плюс на цветном кружке
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
-                                .clickable { onAddTransactionClick() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Добавить транзакцию",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        
                         Text(
                             text = "Трекер финансов",
                             style = MaterialTheme.typography.headlineSmall.copy(
@@ -108,7 +86,23 @@ fun MainScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddTransactionClick,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .padding(bottom = 16.dp, end = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Добавить транзакцию",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -230,7 +224,7 @@ fun MainScreen(
                 }
             }
             
-            // 3. УМНЫЙ СОВЕТНИК (обновленная версия)
+            // 3. УМНЫЙ СОВЕТНИК
             item {
                 // Генерируем структурированный совет на основе данных
                 val smartAdvice = createSmartAdvice(
@@ -389,7 +383,9 @@ fun UpcomingPaymentsSection(
     }
 }
 
-// Функция создания структурированного совета (НЕ @Composable)
+// ========== ФУНКЦИИ ДЛЯ УМНОГО СОВЕТНИКА ==========
+
+// Функция создания структурированного совета
 fun createSmartAdvice(
     rawMessage: String,
     profile: UserProfile?,

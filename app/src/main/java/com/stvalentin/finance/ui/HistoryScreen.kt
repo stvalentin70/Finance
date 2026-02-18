@@ -116,12 +116,23 @@ fun HistoryScreen(
                         )
                     )
                 },
+                actions = {
+                    IconButton(
+                        onClick = { navController.navigate("add_transaction/0") }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Добавить транзакцию"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
         }
+        // floatingActionButton полностью удален!
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
