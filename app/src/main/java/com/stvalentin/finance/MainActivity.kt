@@ -157,7 +157,9 @@ fun FinanceApp() {
                         currentRoute != "add_regular_payment/{paymentId}" &&
                         currentRoute != "add_saving/{savingId}" &&
                         currentRoute != "user_profile" &&
-                        currentRoute != "income_analysis") {  // ← Добавлено
+                        currentRoute != "income_analysis" &&
+                        currentRoute != "help" &&  // ← Добавлено
+                        currentRoute != "faq") {    // ← Добавлено
                         BottomNavigationBar(navController = navController)
                     }
                 }
@@ -254,11 +256,26 @@ fun FinanceApp() {
                             )
                         }
                         
-                        // НОВЫЙ МАРШРУТ ДЛЯ АНАЛИЗА ДОХОДОВ
+                        // МАРШРУТ ДЛЯ АНАЛИЗА ДОХОДОВ
                         composable("income_analysis") {
                             IncomeAnalysisScreen(
                                 navController = navController,
                                 viewModel = viewModel
+                            )
+                        }
+                        
+                        // ========== НОВЫЕ МАРШРУТЫ ДЛЯ ПОМОЩИ ==========
+                        composable("help") {
+                            HelpScreen(
+                                navController = navController,
+                                isFaq = false
+                            )
+                        }
+                        
+                        composable("faq") {
+                            HelpScreen(
+                                navController = navController,
+                                isFaq = true
                             )
                         }
                     }
