@@ -142,7 +142,7 @@ fun FinanceApp() {
                     database.transactionDao(),
                     database.regularPaymentDao(),
                     database.savingDao(),
-                    database.userProfileDao(),  // ← Добавлено
+                    database.userProfileDao(),
                     context
                 )
             )
@@ -156,7 +156,8 @@ fun FinanceApp() {
                     if (currentRoute != "add_transaction/{transactionId}" &&
                         currentRoute != "add_regular_payment/{paymentId}" &&
                         currentRoute != "add_saving/{savingId}" &&
-                        currentRoute != "user_profile") {  // ← Добавлено
+                        currentRoute != "user_profile" &&
+                        currentRoute != "income_analysis") {  // ← Добавлено
                         BottomNavigationBar(navController = navController)
                     }
                 }
@@ -245,9 +246,17 @@ fun FinanceApp() {
                             )
                         }
                         
-                        // НОВЫЙ МАРШРУТ ДЛЯ ПРОФИЛЯ
+                        // МАРШРУТ ДЛЯ ПРОФИЛЯ
                         composable("user_profile") {
                             UserProfileScreen(
+                                navController = navController,
+                                viewModel = viewModel
+                            )
+                        }
+                        
+                        // НОВЫЙ МАРШРУТ ДЛЯ АНАЛИЗА ДОХОДОВ
+                        composable("income_analysis") {
+                            IncomeAnalysisScreen(
                                 navController = navController,
                                 viewModel = viewModel
                             )

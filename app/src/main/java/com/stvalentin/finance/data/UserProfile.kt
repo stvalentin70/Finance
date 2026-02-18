@@ -8,14 +8,14 @@ data class UserProfile(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 1,  // Всегда одна запись с id=1
     
-    // ТЕГИ СТАТУСОВ (все могут быть true одновременно)
-    val isStudent: Boolean = false,        // Студент
-    val isWorker: Boolean = false,         // Работник по найму
-    val isEntrepreneur: Boolean = false,   // Предприниматель
-    val isRetiree: Boolean = false,        // Пенсионер
-    val isInvestor: Boolean = false,       // Инвестор
-    val isHousewife: Boolean = false,      // Домохозяйка/ин
-    val isUnemployed: Boolean = false,     // Безработный
+    // ТЕГИ СТАТУСОВ
+    val isStudent: Boolean = false,
+    val isWorker: Boolean = false,
+    val isEntrepreneur: Boolean = false,
+    val isRetiree: Boolean = false,
+    val isInvestor: Boolean = false,
+    val isHousewife: Boolean = false,
+    val isUnemployed: Boolean = false,
     
     // Основная информация
     val age: Int? = null,
@@ -35,11 +35,15 @@ data class UserProfile(
     val hasCarLoan: Boolean = false,
     val carPayment: Double = 0.0,
     
-    // Доходы
-    val mainIncomeDay: Int = 5,
+    // Доходы (обновлено)
+    val mainIncomeDay: Int = 5,              // День месяца, когда приходит основной доход
+    val mainIncomeSource: String = "Зарплата", // Основной источник дохода
+    val averageMonthlyIncome: Double = 0.0,   // Средний доход за месяц
     val hasPension: Boolean = false,
     val hasSalary: Boolean = false,
     val hasBusinessIncome: Boolean = false,
+    val hasPassiveIncome: Boolean = false,
+    val incomeStability: Double = 1.0,        // Стабильность дохода (1.0 - стабильный)
     
     // Кредиты
     val hasConsumerLoans: Boolean = false,

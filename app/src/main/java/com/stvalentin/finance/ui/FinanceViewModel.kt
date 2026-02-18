@@ -92,6 +92,28 @@ class FinanceViewModel(
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
     
+    // ========== ДАННЫЕ ДЛЯ АНАЛИЗА ДОХОДОВ ==========
+    private val _averageMonthlyIncome = MutableStateFlow(0.0)
+    val averageMonthlyIncome: StateFlow<Double> = _averageMonthlyIncome.asStateFlow()
+    
+    private val _mainIncomeSource = MutableStateFlow("Зарплата")
+    val mainIncomeSource: StateFlow<String> = _mainIncomeSource.asStateFlow()
+    
+    private val _incomeDays = MutableStateFlow<List<Int>>(emptyList())
+    val incomeDays: StateFlow<List<Int>> = _incomeDays.asStateFlow()
+    
+    private val _typicalIncomeDay = MutableStateFlow(5)
+    val typicalIncomeDay: StateFlow<Int> = _typicalIncomeDay.asStateFlow()
+    
+    private val _incomeStability = MutableStateFlow(1.0)
+    val incomeStability: StateFlow<Double> = _incomeStability.asStateFlow()
+    
+    private val _nextIncomeDate = MutableStateFlow<Long?>(null)
+    val nextIncomeDate: StateFlow<Long?> = _nextIncomeDate.asStateFlow()
+    
+    private val _daysToNextIncome = MutableStateFlow(0)
+    val daysToNextIncome: StateFlow<Int> = _daysToNextIncome.asStateFlow()
+    
     // ========== ДАННЫЕ ДЛЯ СТАТИСТИКИ ==========
     private val _statsMode = MutableStateFlow(StatsMode.SINGLE)
     val statsMode: StateFlow<StatsMode> = _statsMode.asStateFlow()
@@ -200,7 +222,7 @@ class FinanceViewModel(
         initialValue = 0.0
     )
     
-    // Совет дня (обновленный с учетом профиля)
+    // Совет дня (обновленный)
     val adviceMessage = combine(
         topExpenseCategory,
         expenseComparison,
@@ -255,6 +277,11 @@ class FinanceViewModel(
             }
         }
         
+        // Анализируем доходы
+        viewModelScope.launch {
+            analyzeIncome()
+        }
+        
         viewModelScope.launch {
             loadStats()
         }
@@ -262,12 +289,93 @@ class FinanceViewModel(
         setupReminderWorker()
     }
     
+    // ========== МЕТОДЫ ДЛЯ АНАЛИЗА ДОХОДОВ ==========
+    
+    private suspend fun analyzeIncome() {
+        // Получаем все доходы за последние 6 месяцев
+        val calendar = Calendar.getInstance()
+        val endDate = calendar.timeInMillis
+        calendar.add(Calendar.MONTH, -6)
+        val startDate = calendar.timeInMillis
+        
+        val incomes = transactionDao.getTransactionsBetweenDates(startDate, endDate)
+            .filter { it.type == TransactionType.INCOME }
+        
+        if (incomes.isEmpty()) return
+        
+        // Средний доход за месяц
+        val totalIncome6Months = incomes.sumOf { it.amount }
+        _averageMonthlyIncome.value = totalIncome6Months / 6
+        
+        // Основной источник дохода
+        val incomeByCategory = incomes.groupBy { it.category }
+            .mapValues { it.value.sumOf { it.amount } }
+        _mainIncomeSource.value = incomeByCategory.maxByOrNull { it.value }?.key ?: "Зарплата"
+        
+        // Анализ дней дохода
+        val incomeDaysList = incomes.map { 
+            Calendar.getInstance().apply { timeInMillis = it.date }.get(Calendar.DAY_OF_MONTH)
+        }
+        _incomeDays.value = incomeDaysList
+        
+        // Типичный день дохода (наиболее частый)
+        val dayFrequency = incomeDaysList.groupingBy { it }.eachCount()
+        _typicalIncomeDay.value = dayFrequency.maxByOrNull { it.value }?.key ?: 5
+        
+        // Стабильность дохода (стандартное отклонение)
+        if (incomes.size > 1) {
+            val amounts = incomes.map { it.amount }
+            val mean = amounts.average()
+            val variance = amounts.map { (it - mean) * (it - mean) }.average()
+            val stdDev = kotlin.math.sqrt(variance)
+            _incomeStability.value = 1.0 - (stdDev / mean).coerceIn(0.0, 1.0)
+        }
+        
+        // Следующая дата дохода
+        calculateNextIncomeDate()
+        
+        // Обновляем профиль с аналитикой
+        _userProfile.value?.let { profile ->
+            val updatedProfile = profile.copy(
+                averageMonthlyIncome = _averageMonthlyIncome.value,
+                mainIncomeSource = _mainIncomeSource.value,
+                mainIncomeDay = _typicalIncomeDay.value,
+                incomeStability = _incomeStability.value
+            )
+            userProfileDao.update(updatedProfile)
+        }
+    }
+    
+    private suspend fun calculateNextIncomeDate() {
+        val today = Calendar.getInstance()
+        val currentDay = today.get(Calendar.DAY_OF_MONTH)
+        val currentMonth = today.get(Calendar.MONTH)
+        val currentYear = today.get(Calendar.YEAR)
+        
+        val typicalDay = _typicalIncomeDay.value
+        
+        val nextIncome = Calendar.getInstance()
+        
+        if (typicalDay > currentDay) {
+            // В этом месяце
+            nextIncome.set(currentYear, currentMonth, typicalDay, 12, 0, 0)
+        } else {
+            // В следующем месяце
+            nextIncome.add(Calendar.MONTH, 1)
+            nextIncome.set(nextIncome.get(Calendar.YEAR), nextIncome.get(Calendar.MONTH), typicalDay, 12, 0, 0)
+        }
+        
+        _nextIncomeDate.value = nextIncome.timeInMillis
+        
+        val daysDiff = ((nextIncome.timeInMillis - System.currentTimeMillis()) / (24 * 60 * 60 * 1000)).toInt()
+        _daysToNextIncome.value = daysDiff.coerceAtLeast(0)
+    }
+    
     // ========== МЕТОДЫ ДЛЯ ПРОФИЛЯ ==========
     
     fun updateUserProfile(profile: UserProfile) {
         viewModelScope.launch {
             userProfileDao.update(profile)
-            // Профиль обновится через Flow автоматически
         }
     }
     
@@ -442,7 +550,7 @@ class FinanceViewModel(
         _periodBIncomeStats.value = emptyList()
     }
     
-    // ========== ОБНОВЛЕННЫЙ СОВЕТНИК (с учетом профиля) ==========
+    // ========== ОБНОВЛЕННЫЙ СОВЕТНИК ==========
     
     private fun generateAdvice(
         topCategory: Pair<String, Double>?,
@@ -456,8 +564,8 @@ class FinanceViewModel(
             return "👤 Заполните профиль в настройках для персональных советов"
         }
         
-        val activeStatuses = profile.getActiveStatuses()
         val statusEmojis = profile.getActiveStatusEmojis()
+        val daysToIncome = _daysToNextIncome.value
         
         // 1. КРАСНЫЙ УРОВЕНЬ - критично
         if (periodExpenses.value > periodIncome.value && periodIncome.value > 0) {
@@ -471,30 +579,27 @@ class FinanceViewModel(
             return "⚠️ Свободных средств (${"%.0f".format(availableBalance)} ₽) едва хватает на обязательные платежи (${"%.0f".format(monthlyObligations)} ₽). Будьте осторожны"
         }
         
-        // 3. ЖЕЛТЫЙ УРОВЕНЬ - рекомендации по статусам
-        val adviceList = mutableListOf<String>()
-        
-        // Советы для пенсионеров
-        if (profile.isRetiree) {
-            val daysToPension = getDaysToNextIncome(profile)
-            if (daysToPension in 1..10) {
-                adviceList.add("👴 До пенсии $daysToPension дней. Остаток: ${"%.0f".format(availableBalance)} ₽")
-            }
+        // 3. ЖЕЛТЫЙ УРОВЕНЬ - рекомендации по доходу
+        if (daysToIncome in 1..7) {
+            val dailyBudget = availableBalance / daysToIncome
+            return "$statusEmojis До ${getIncomeSourceName(profile.mainIncomeSource)} $daysToIncome дн. Остаток: ${"%.0f".format(availableBalance)} ₽. Лимит на день: ${"%.0f".format(dailyBudget)} ₽"
         }
         
-        // Советы для студентов
+        // 4. ЖЕЛТЫЙ УРОВЕНЬ - рекомендации по статусам
+        val adviceList = mutableListOf<String>()
+        
+        if (profile.isRetiree && daysToIncome in 1..10) {
+            adviceList.add("👴 До пенсии $daysToIncome дней")
+        }
+        
         if (profile.isStudent) {
             topCategory?.let { (cat, amount) ->
                 if (cat == "Кафе" || cat == "Рестораны") {
                     adviceList.add("🎓 На кафе уходит ${"%.0f".format(amount)} ₽. Готовка дома сэкономит ${"%.0f".format(amount * 0.4)} ₽")
                 }
             }
-            if (totalSavings < 10000) {
-                adviceList.add("🎓 Начните копить! Даже 1000 ₽ в месяц = 12 000 ₽ в год")
-            }
         }
         
-        // Советы для работников
         if (profile.isWorker) {
             topCategory?.let { (cat, amount) ->
                 if (cat == "Доставка еды") {
@@ -503,60 +608,40 @@ class FinanceViewModel(
             }
         }
         
-        // Советы для предпринимателей
-        if (profile.isEntrepreneur) {
-            if (comparison > 20) {
-                adviceList.add("📈 Расходы бизнеса выросли на ${"%.0f".format(comparison)}%. Проверьте обоснованность трат")
-            }
-        }
-        
-        // Советы для инвесторов
-        if (profile.isInvestor && totalSavings > 100000) {
-            adviceList.add("📈 С инвестициями ${"%.0f".format(totalSavings)} ₽. Рассмотрите диверсификацию")
-        }
-        
-        // Советы по ипотеке
         if (profile.hasMortgage) {
-            adviceList.add("🏠 Платеж по ипотеке ${"%.0f".format(profile.housingPayment)} ₽. Не забывайте про досрочное погашение")
+            adviceList.add("🏠 Платеж по ипотеке ${"%.0f".format(profile.housingPayment)} ₽")
         }
         
-        // Советы по автокредиту
         if (profile.hasCarLoan) {
             adviceList.add("🚗 Кредит за авто ${"%.0f".format(profile.carPayment)} ₽/мес")
         }
         
-        // Советы по детям
         if (profile.hasChildren) {
-            adviceList.add("👶 На детей (${profile.dependents}) запланируйте бюджет на образование и развитие")
+            adviceList.add("👶 На детей (${profile.dependents}) запланируйте бюджет")
         }
         
-        // 4. Если есть конкретные советы по статусам - показываем их
         if (adviceList.isNotEmpty()) {
             return "$statusEmojis ${adviceList.first()}"
         }
         
         // 5. ЗЕЛЕНЫЙ УРОВЕНЬ - мотивация
         if (totalSavings > 100000) {
-            return "🏆 Отличные накопления! ${"%.0f".format(totalSavings)} ₽. Пора изучать инвестиции"
+            return "🏆 Отличные накопления! ${"%.0f".format(totalSavings)} ₽"
         }
         
         if (comparison < -10) {
-            return "📉 Отлично! Расходы снизились на ${"%.0f".format(-comparison)}% по сравнению с прошлым месяцем"
+            return "📉 Отлично! Расходы снизились на ${"%.0f".format(-comparison)}%"
         }
         
         // 6. СИНИЙ УРОВЕНЬ - информация
-        return "💡 Свободно ${"%.0f".format(availableBalance)} ₽. Рекомендуем отложить 10% (${"%.0f".format(availableBalance * 0.1)} ₽) в копилку"
+        return "💡 Свободно ${"%.0f".format(availableBalance)} ₽. Рекомендуем отложить 10% (${"%.0f".format(availableBalance * 0.1)} ₽)"
     }
     
-    private fun getDaysToNextIncome(profile: UserProfile): Int {
-        val calendar = Calendar.getInstance()
-        val today = calendar.get(Calendar.DAY_OF_MONTH)
-        val incomeDay = profile.mainIncomeDay
-        
-        return if (incomeDay >= today) {
-            incomeDay - today
-        } else {
-            (incomeDay + calendar.getActualMaximum(Calendar.DAY_OF_MONTH)) - today
+    private fun getIncomeSourceName(source: String): String {
+        return when (source) {
+            "Зарплата" -> "зарплаты"
+            "Пенсия" -> "пенсии"
+            else -> "дохода"
         }
     }
     
@@ -584,6 +669,7 @@ class FinanceViewModel(
             transactionDao.insert(transaction)
             updateWidget()
             loadStats()
+            analyzeIncome() // Пересчитываем анализ доходов
         }
     }
     
@@ -592,6 +678,7 @@ class FinanceViewModel(
             transactionDao.update(transaction)
             updateWidget()
             loadStats()
+            analyzeIncome()
         }
     }
     
@@ -600,6 +687,7 @@ class FinanceViewModel(
             transactionDao.delete(transaction)
             updateWidget()
             loadStats()
+            analyzeIncome()
         }
     }
     
@@ -608,6 +696,7 @@ class FinanceViewModel(
             transactionDao.deleteAll()
             updateWidget()
             loadStats()
+            analyzeIncome()
         }
     }
     
@@ -683,6 +772,7 @@ class FinanceViewModel(
             
             updateWidget()
             loadStats()
+            analyzeIncome()
         }
     }
     

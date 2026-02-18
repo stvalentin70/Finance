@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
         Saving::class,
         UserProfile::class
     ],
-    version = 4,
+    version = 5,  // ← Увеличено с 4 до 5
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, DateConverters::class)
